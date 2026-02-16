@@ -26,4 +26,5 @@ jobs:
           API_ID: ${{ secrets.API_ID }}
           API_HASH: ${{ secrets.API_HASH }}
           TELEGRAM_SESSION: ${{ secrets.TELEGRAM_SESSION }}
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}  # <--- 이 줄을 꼭 추가해야 합니다!
         run: python bot.py
