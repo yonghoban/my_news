@@ -51,61 +51,64 @@ def is_similar(text1, text2, threshold=0.90):
     if not text1 or not text2: return False
     return SequenceMatcher(None, text1, text2).ratio() >= threshold
 
-# [NEW] 확실하게 전송하고 결과 확인하는 함수
-def send_via_bot(chat_id, text):
+# [기능 1] 텍스트만 보낼 때
+def send_text_via_bot(chat_id, text):
     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
     payload = {
-        "chat_id": chat_id, # 이제 정확한 숫자 ID를 씁니다
+        "chat_id": chat_id,
         "text": text,
-        "parse_mode": "Markdown",
         "disable_web_page_preview": True
     }
     try:
-        response = requests.post(url, json=payload)
-        if response.status_code == 200:
-            return True # 성공!
-        else:
-            print(f"⚠️ [전송 실패] 원인: {response.text}") # 에러 원인 출력
-            return False
+        requests.post(url, json=payload)
+        return True
     except Exception as e:
-        print(f"⚠️ [통신 에러]: {e}")
+        print(f"⚠️ 텍스트 전송 실패: {e}")
+        return False
+
+# [기능 2] 사진+텍스트 보낼 때 (NEW!)
+def send_photo_via_bot(chat_id, photo_path, caption):
+    url = f"https://api.telegram.org/bot{bot_token}/sendPhoto"
+    try:
+        with open(photo_path, 'rb') as photo:
+            payload = {"chat_id": chat_id, "caption": caption}
+            files = {"photo": photo}
+            requests.post(url, data=payload, files=files)
+        return True
+    except Exception as e:
+        print(f"⚠️ 사진 전송 실패: {e}")
         return False
 
 async def main():
     await client.start()
     
-    # 1. 내 채널의 '진짜 숫자 ID' 알아내기 (Userbot의 능력 사용)
+    # 1. 내 채널 진짜 ID 찾기
     try:
         entity = await client.get_entity(target_channel_username)
-        # 텔레그램 채널 ID 규칙: 앞에 -100을 붙여야 봇이 인식함
         real_bot_id = int(f"-100{entity.id}")
-        print(f"✅ 채널 확인 완료! 봇용 ID: {real_bot_id}")
-        
-        # [테스트] 봇 생존 신고
-        if send_via_bot(real_bot_id, "🟢 봇 연결 성공! 뉴스 감시를 시작합니다."):
-            print("🔔 테스트 메시지 전송 성공")
-        else:
-            print("❌ 테스트 메시지 전송 실패 (위 에러 로그 확인)")
-            
+        print(f"✅ 타겟 채널 ID: {real_bot_id}")
     except Exception as e:
-        print(f"❌ 채널을 찾을 수 없습니다: {e}")
+        print(f"❌ 채널 찾기 실패: {e}")
         return
 
     print("뉴스 스캔 시작...")
 
-    # 2. 최근 글 목록 가져오기
+    # 2. 중복 방지용 최근 글 로딩
     recent_my_msgs = []
     async for msg in client.iter_messages(target_channel_username, limit=30):
-        if msg.text: recent_my_msgs.append(msg.text)
+        # 캡션(사진설명)이 있으면 캡션을, 없으면 텍스트를 저장
+        text = msg.message
+        if text: recent_my_msgs.append(text)
 
     # 3. 뉴스 가져오기
     for channel in source_channels:
         try:
             async for msg in client.iter_messages(channel, limit=5):
+                # 20분 컷
                 time_diff = datetime.now(timezone.utc) - msg.date
-                if time_diff.total_seconds() > 1200: continue # 20분
+                if time_diff.total_seconds() > 1200: continue
 
-                new_text = msg.text if msg.text else ""
+                new_text = msg.message if msg.message else ""
                 
                 # 중복 검사
                 is_duplicate = False
@@ -118,16 +121,32 @@ async def main():
                     print(f"PASS: 중복 ({channel})")
                     continue
 
-                # [전송]
+                # [전송 시작]
                 try:
                     chat = await client.get_entity(channel)
                     source_name = chat.title
-                    final_msg = f"**[{source_name}]**\n{new_text}"
                     
-                    # 봇에게 '진짜 ID'로 배달 시킴
-                    if send_via_bot(real_bot_id, final_msg):
-                        print(f"SENT: {source_name} -> 내 채널 (성공)")
-                        if new_text: recent_my_msgs.append(new_text)
+                    # 메시지 꾸미기
+                    final_msg = f"[{source_name}]\n{new_text}"
+                    
+                    # A. 사진이 있는 경우
+                    if msg.photo:
+                        print(f"📸 사진 발견! 다운로드 중... ({source_name})")
+                        # 사진을 잠시 다운로드
+                        path = await client.download_media(msg.photo, file="temp.jpg")
+                        # 봇으로 전송
+                        send_photo_via_bot(real_bot_id, path, final_msg)
+                        # 임시 파일 삭제
+                        os.remove(path)
+                        print(f"SENT: {source_name} (사진)")
+
+                    # B. 글자만 있는 경우
+                    else:
+                        send_text_via_bot(real_bot_id, final_msg)
+                        print(f"SENT: {source_name} (텍스트)")
+
+                    # 중복 리스트에 추가
+                    if new_text: recent_my_msgs.append(new_text)
                     
                 except Exception as e:
                     print(f"Error processing {channel}: {e}")
