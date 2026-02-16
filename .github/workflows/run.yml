@@ -19,7 +19,7 @@ jobs:
 
       - name: Install libraries
         run: |
-          pip install telethon
+          pip install telethon requests
 
       - name: Run bot script
         env:
