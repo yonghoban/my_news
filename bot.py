@@ -1,18 +1,18 @@
 import os
 import asyncio
+import requests # 봇 배달을 위해 추가
 from telethon import TelegramClient
 from telethon.sessions import StringSession
-from telethon.errors import ChatForwardsRestrictedError
 from difflib import SequenceMatcher
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 # === [설정 영역] ===
-# 깃허브 비밀금고에서 꺼내 쓰는 정보들
 api_id = int(os.environ["API_ID"])
 api_hash = os.environ["API_HASH"]
 session_string = os.environ["TELEGRAM_SESSION"]
+bot_token = os.environ["BOT_TOKEN"] # 새로 추가된 배달부 토큰
 
-# ▼ 감시할 채널들 (여기에 추가하세요)
+# 감시할 채널들
 source_channels = [
     '@WeCryptoTogether', '@lnsanecoin', '@seaotterbtc', '@cryptomouseview', '@jammin0720',
     '@yobeullyANN', '@justdegenguy', '@moneygrid', '@tlsrltnf', '@doriworld', 
@@ -41,7 +41,7 @@ source_channels = [
     '@eastsouthwind'
 ]
 
-# ▼ 내 채널 (타겟)
+# 내 채널 (타겟)
 target_channel = '@turtleking10' 
 # ===================
 
@@ -51,24 +51,37 @@ def is_similar(text1, text2, threshold=0.90):
     if not text1 or not text2: return False
     return SequenceMatcher(None, text1, text2).ratio() >= threshold
 
+# [NEW] 배달부(Bot)가 메시지를 쏘는 함수
+def send_via_bot(text):
+    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+    payload = {
+        "chat_id": target_channel,
+        "text": text,
+        "parse_mode": "Markdown",
+        "disable_web_page_preview": True
+    }
+    try:
+        requests.post(url, json=payload)
+    except Exception as e:
+        print(f"Bot send error: {e}")
+
 async def main():
     await client.start()
-    print("봇이 깨어났습니다. 지난 뉴스를 확인합니다...")
+    print("봇이 깨어났습니다. 뉴스 확인 중...")
 
     # 1. 내 채널의 최근 글들을 미리 가져옴 (중복 비교용)
     recent_my_msgs = []
+    # 주의: 봇이 보낸 글도 읽어와야 하므로, 여기서는 그냥 최근 글 텍스트만 수집
     async for msg in client.iter_messages(target_channel, limit=30):
         if msg.text: recent_my_msgs.append(msg.text)
 
     # 2. 감시 대상 채널 순회
     for channel in source_channels:
         try:
-            # 각 채널에서 '최근 15분 이내'에 올라온 글만 가져옴 (limit=3)
-            # 깃허브가 15분마다 도니까, 그 사이에 올라온 것만 보면 됨
             async for msg in client.iter_messages(channel, limit=5):
-                # 너무 오래된 글(20분 이상)은 무시
+                # 20분 이상 된 글 무시
                 time_diff = datetime.now(timezone.utc) - msg.date
-                if time_diff.total_seconds() > 1200: # 20분
+                if time_diff.total_seconds() > 1200: 
                     continue
 
                 new_text = msg.text if msg.text else ""
@@ -76,35 +89,38 @@ async def main():
                 # 중복 검사
                 is_duplicate = False
                 for old_text in recent_my_msgs:
-                    if is_similar(new_text, old_text):
+                    if old_text and is_similar(new_text, old_text): # old_text가 None이 아닐때만
                         is_duplicate = True
                         break
                 
                 if is_duplicate:
-                    print(f"PASS: 중복된 내용 ({channel})")
+                    print(f"PASS: 중복 ({channel})")
                     continue
 
-                # 전송 (포워딩)
+                # [전송] 봇을 통해 배달! (Unread 배지를 위해)
+                # 포워딩 대신 '복사+붙여넣기' 방식을 씁니다.
                 try:
                     chat = await client.get_entity(channel)
                     source_name = chat.title
                     
-                    await client.forward_messages(target_channel, msg)
-                    print(f"SENT: {source_name} -> 내 채널")
+                    # 메시지 꾸미기
+                    final_msg = f"**[{source_name}]**\n{new_text}"
                     
-                    # 방금 보낸 것도 중복 리스트에 추가 (이번 실행 중에 또 안 보내게)
+                    # 배달부에게 전송 지시
+                    send_via_bot(final_msg)
+                    
+                    print(f"SENT: {source_name} -> 내 채널 (by Bot)")
+                    
+                    # 방금 보낸 것도 중복 리스트에 추가
                     if new_text: recent_my_msgs.append(new_text)
 
-                except ChatForwardsRestrictedError:
-                    # 포워딩 금지면 복사해서 보냄
-                    await client.send_message(target_channel, f"**[{source_name}]** (🔒포워딩 불가)\n{new_text}")
                 except Exception as e:
-                    print(f"Error forwarding from {channel}: {e}")
+                    print(f"Error processing {channel}: {e}")
 
         except Exception as e:
             print(f"Error checking {channel}: {e}")
 
-    print("확인 끝. 봇이 다시 잠듭니다.")
+    print("확인 끝.")
 
 with client:
     client.loop.run_until_complete(main())
