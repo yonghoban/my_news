@@ -44,9 +44,7 @@ source_channels = [
 target_channel_username = '@turtleking10'
 # ===================
 
-# 1. 정보 수집용 (내 계정)
 client = TelegramClient(StringSession(session_string), api_id, api_hash)
-# 2. 배달용 (봇 계정) - 이렇게 하면 봇도 텔레그램 기능을 풀로 씁니다
 bot = TelegramClient('bot_session', api_id, api_hash)
 
 def is_similar(text1, text2, threshold=0.90):
@@ -56,9 +54,9 @@ def is_similar(text1, text2, threshold=0.90):
 async def main():
     print("🚀 봇 시스템 가동 중...")
     await client.start()
-    await bot.start(bot_token=bot_token) # 봇 로그인
+    await bot.start(bot_token=bot_token)
 
-    # 1. 내 채널 진짜 ID 찾기
+    # 1. 타겟 채널 ID 확인
     try:
         entity = await client.get_entity(target_channel_username)
         real_bot_id = int(f"-100{entity.id}")
@@ -67,13 +65,11 @@ async def main():
         print(f"❌ 채널 찾기 실패: {e}")
         return
 
-    # 2. 중복 방지용 최근 글 로딩
+    # 2. 최근 글 로딩 (중복 방지)
     recent_my_msgs = []
     async for msg in client.iter_messages(target_channel_username, limit=30):
-        # 봇이 보낸 메시지 포맷에서 원본 텍스트만 추출하기 위한 처리
         text = msg.message
         if text: 
-            # "📢 채널명" 헤더를 제외하고 내용만 비교
             clean_text = text.split('\n\n', 1)[-1] if '\n\n' in text else text
             recent_my_msgs.append(clean_text)
 
@@ -98,45 +94,41 @@ async def main():
                     print(f"PASS: 중복 ({channel})")
                     continue
 
-                # [전송 시작]
+                # [전송]
                 try:
                     chat = await client.get_entity(channel)
                     source_name = chat.title
                     
-                    # ✨ 디자인 업그레이드 ✨
-                    # 봇이지만 '전달된 메시지' 느낌을 내기 위해 헤더를 진하게 붙입니다.
-                    header = f"**⏩ {source_name}**\n\n"
-                    final_caption = header + new_text
+                    # === [핵심 수정] 하이퍼링크 생성 ===
+                    # 채널 이름에 원본 메시지 링크를 심습니다.
+                    # 예: https://t.me/WeCryptoTogether/1234
+                    username = channel.replace('@', '') # @ 제거
+                    post_link = f"https://t.me/{username}/{msg.id}"
                     
-                    # 미디어(사진, 영상, 파일)가 있는 경우
+                    # 마크다운 링크 문법: [보여질글자](주소)
+                    header = f"**[⏩ {source_name}]({post_link})**\n\n"
+                    final_caption = header + new_text
+                    # ================================
+                    
                     if msg.media:
-                        print(f"📦 미디어 발견! 다운로드 중... ({source_name})")
-                        # 1. 내 계정으로 다운로드
                         file_path = await client.download_media(msg.media)
-                        
-                        # 2. 봇으로 업로드 (캡션과 함께)
                         await bot.send_message(
                             real_bot_id,
                             final_caption,
                             file=file_path,
                             link_preview=False 
                         )
-                        
-                        # 3. 임시 파일 삭제
                         if os.path.exists(file_path):
                             os.remove(file_path)
-                        print(f"SENT: {source_name} (미디어+텍스트)")
-
-                    # 글자만 있는 경우
+                        print(f"SENT: {source_name} (미디어)")
                     else:
                         await bot.send_message(
                             real_bot_id, 
                             final_caption,
-                            link_preview=True # 링크가 있으면 미리보기 띄움
+                            link_preview=True # 링크 미리보기 켜기
                         )
                         print(f"SENT: {source_name} (텍스트)")
 
-                    # 중복 리스트에 추가
                     if new_text: recent_my_msgs.append(new_text)
                     
                 except Exception as e:
@@ -147,6 +139,5 @@ async def main():
 
     print("확인 끝.")
 
-# 두 개의 클라이언트를 동시에 실행
 with client:
     client.loop.run_until_complete(main())
