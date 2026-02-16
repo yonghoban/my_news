@@ -65,11 +65,12 @@ async def main():
         print(f"❌ 채널 찾기 실패: {e}")
         return
 
-    # 2. 최근 글 로딩 (중복 방지)
+    # 2. 최근 글 로딩 (헤더 제외하고 내용만 비교)
     recent_my_msgs = []
     async for msg in client.iter_messages(target_channel_username, limit=30):
         text = msg.message
         if text: 
+            # "Forwarded from:" 뒷부분(본문)만 잘라서 저장
             clean_text = text.split('\n\n', 1)[-1] if '\n\n' in text else text
             recent_my_msgs.append(clean_text)
 
@@ -99,16 +100,16 @@ async def main():
                     chat = await client.get_entity(channel)
                     source_name = chat.title
                     
-                    # === [핵심 수정] 하이퍼링크 생성 ===
-                    # 채널 이름에 원본 메시지 링크를 심습니다.
-                    # 예: https://t.me/WeCryptoTogether/1234
-                    username = channel.replace('@', '') # @ 제거
+                    # === [디자인 수정 부분] ===
+                    # 1. 링크 만들기
+                    username = channel.replace('@', '') 
                     post_link = f"https://t.me/{username}/{msg.id}"
                     
-                    # 마크다운 링크 문법: [보여질글자](주소)
-                    header = f"**[⏩ {source_name}]({post_link})**\n\n"
+                    # 2. 헤더 만들기 (원하시는 스타일로 변경)
+                    # ↪️ Forwarded from: 채널명 (클릭가능)
+                    header = f"↪️ Forwarded from: **[{source_name}]({post_link})**\n\n"
                     final_caption = header + new_text
-                    # ================================
+                    # ========================
                     
                     if msg.media:
                         file_path = await client.download_media(msg.media)
@@ -125,7 +126,7 @@ async def main():
                         await bot.send_message(
                             real_bot_id, 
                             final_caption,
-                            link_preview=True # 링크 미리보기 켜기
+                            link_preview=True 
                         )
                         print(f"SENT: {source_name} (텍스트)")
 
