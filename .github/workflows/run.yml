@@ -1,0 +1,29 @@
+name: Telegram Bot Run
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'  # 10분마다 실행 (원하면 숫자 변경 가능)
+  workflow_dispatch:      # 수동 실행 버튼 추가
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.9'
+
+      - name: Install libraries
+        run: |
+          pip install telethon
+
+      - name: Run bot script
+        env:
+          API_ID: ${{ secrets.API_ID }}
+          API_HASH: ${{ secrets.API_HASH }}
+          TELEGRAM_SESSION: ${{ secrets.TELEGRAM_SESSION }}
+        run: python bot.py
