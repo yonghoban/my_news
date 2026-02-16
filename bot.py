@@ -1,6 +1,5 @@
 import os
 import asyncio
-import requests
 from telethon import TelegramClient
 from telethon.sessions import StringSession
 from difflib import SequenceMatcher
@@ -45,43 +44,20 @@ source_channels = [
 target_channel_username = '@turtleking10'
 # ===================
 
+# 1. 정보 수집용 (내 계정)
 client = TelegramClient(StringSession(session_string), api_id, api_hash)
+# 2. 배달용 (봇 계정) - 이렇게 하면 봇도 텔레그램 기능을 풀로 씁니다
+bot = TelegramClient('bot_session', api_id, api_hash)
 
 def is_similar(text1, text2, threshold=0.90):
     if not text1 or not text2: return False
     return SequenceMatcher(None, text1, text2).ratio() >= threshold
 
-# [기능 1] 텍스트만 보낼 때
-def send_text_via_bot(chat_id, text):
-    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-    payload = {
-        "chat_id": chat_id,
-        "text": text,
-        "disable_web_page_preview": True
-    }
-    try:
-        requests.post(url, json=payload)
-        return True
-    except Exception as e:
-        print(f"⚠️ 텍스트 전송 실패: {e}")
-        return False
-
-# [기능 2] 사진+텍스트 보낼 때 (NEW!)
-def send_photo_via_bot(chat_id, photo_path, caption):
-    url = f"https://api.telegram.org/bot{bot_token}/sendPhoto"
-    try:
-        with open(photo_path, 'rb') as photo:
-            payload = {"chat_id": chat_id, "caption": caption}
-            files = {"photo": photo}
-            requests.post(url, data=payload, files=files)
-        return True
-    except Exception as e:
-        print(f"⚠️ 사진 전송 실패: {e}")
-        return False
-
 async def main():
+    print("🚀 봇 시스템 가동 중...")
     await client.start()
-    
+    await bot.start(bot_token=bot_token) # 봇 로그인
+
     # 1. 내 채널 진짜 ID 찾기
     try:
         entity = await client.get_entity(target_channel_username)
@@ -91,14 +67,15 @@ async def main():
         print(f"❌ 채널 찾기 실패: {e}")
         return
 
-    print("뉴스 스캔 시작...")
-
     # 2. 중복 방지용 최근 글 로딩
     recent_my_msgs = []
     async for msg in client.iter_messages(target_channel_username, limit=30):
-        # 캡션(사진설명)이 있으면 캡션을, 없으면 텍스트를 저장
+        # 봇이 보낸 메시지 포맷에서 원본 텍스트만 추출하기 위한 처리
         text = msg.message
-        if text: recent_my_msgs.append(text)
+        if text: 
+            # "📢 채널명" 헤더를 제외하고 내용만 비교
+            clean_text = text.split('\n\n', 1)[-1] if '\n\n' in text else text
+            recent_my_msgs.append(clean_text)
 
     # 3. 뉴스 가져오기
     for channel in source_channels:
@@ -126,23 +103,37 @@ async def main():
                     chat = await client.get_entity(channel)
                     source_name = chat.title
                     
-                    # 메시지 꾸미기
-                    final_msg = f"[{source_name}]\n{new_text}"
+                    # ✨ 디자인 업그레이드 ✨
+                    # 봇이지만 '전달된 메시지' 느낌을 내기 위해 헤더를 진하게 붙입니다.
+                    header = f"**⏩ {source_name}**\n\n"
+                    final_caption = header + new_text
                     
-                    # A. 사진이 있는 경우
-                    if msg.photo:
-                        print(f"📸 사진 발견! 다운로드 중... ({source_name})")
-                        # 사진을 잠시 다운로드
-                        path = await client.download_media(msg.photo, file="temp.jpg")
-                        # 봇으로 전송
-                        send_photo_via_bot(real_bot_id, path, final_msg)
-                        # 임시 파일 삭제
-                        os.remove(path)
-                        print(f"SENT: {source_name} (사진)")
+                    # 미디어(사진, 영상, 파일)가 있는 경우
+                    if msg.media:
+                        print(f"📦 미디어 발견! 다운로드 중... ({source_name})")
+                        # 1. 내 계정으로 다운로드
+                        file_path = await client.download_media(msg.media)
+                        
+                        # 2. 봇으로 업로드 (캡션과 함께)
+                        await bot.send_message(
+                            real_bot_id,
+                            final_caption,
+                            file=file_path,
+                            link_preview=False 
+                        )
+                        
+                        # 3. 임시 파일 삭제
+                        if os.path.exists(file_path):
+                            os.remove(file_path)
+                        print(f"SENT: {source_name} (미디어+텍스트)")
 
-                    # B. 글자만 있는 경우
+                    # 글자만 있는 경우
                     else:
-                        send_text_via_bot(real_bot_id, final_msg)
+                        await bot.send_message(
+                            real_bot_id, 
+                            final_caption,
+                            link_preview=True # 링크가 있으면 미리보기 띄움
+                        )
                         print(f"SENT: {source_name} (텍스트)")
 
                     # 중복 리스트에 추가
@@ -156,5 +147,6 @@ async def main():
 
     print("확인 끝.")
 
+# 두 개의 클라이언트를 동시에 실행
 with client:
     client.loop.run_until_complete(main())
