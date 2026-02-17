@@ -11,16 +11,17 @@ api_hash = os.environ["API_HASH"]
 session_string = os.environ["TELEGRAM_SESSION"]
 bot_token = os.environ["BOT_TOKEN"]
 
-# [광고 금지어 목록]
+# ▼▼▼ [광고 금지어 목록] (수정됨: 수수료 할인, 레퍼럴, 선착순 제외함) ▼▼▼
 ad_keywords = [
-    "#ad", "#광고", "유료광고", "소정의 고료", "레퍼럴", "가입링크", 
-    "수수료 할인", "거래소 가입", "증정금", "협찬", "파트너십", 
-    "Sponsored", "Promo", "referral", "register", "sign up"
+    "#ad", "#광고", "유료광고", "소정의 고료", "가입링크", 
+    "거래소 가입", "증정금", "협찬", "파트너십", 
+    "Sponsored", "Promo", "referral", "register", "sign up",
+    "입금 이벤트", "가입 이벤트"
 ]
+# ▲▲▲ ----------------------------------------------------------------- ▲▲▲
 
-# 감시할 채널들 (새로 추가한 채널 포함)
+# 감시할 채널들
 source_channels = [
-    # === [기존 채널들] ===
     '@WeCryptoTogether', '@lnsanecoin', '@seaotterbtc', '@cryptomouseview', '@jammin0720',
     '@yobeullyANN', '@justdegenguy', '@moneygrid', '@tlsrltnf', '@doriworld', 
     '@Raoni1', '@airdropcosm', '@Gorae_gorae', '@dontworrymomcoinverygood', '@Edenitywl', 
@@ -46,8 +47,6 @@ source_channels = [
     '@CODE007_KR', '@whalemove_trade', '@Info_Arbitrage', '@bokjisaideashare', '@Info_Arbitrage', 
     '@subin_gamefi_lab', '@gorochidangi', '@kbc80', '@coin369369', '@gmrvillage', 
     '@eastsouthwind',
-
-    # === [새로 추가된 채널들] ===
     '@hyperliquid_announcements', '@narockisrock1', '@Web3LearningWithInger', 
     '@Dove262', '@mujammin123', '@jh_6598', '@jueokman', '@c0wfarm'
 ]
