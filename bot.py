@@ -11,8 +11,16 @@ api_hash = os.environ["API_HASH"]
 session_string = os.environ["TELEGRAM_SESSION"]
 bot_token = os.environ["BOT_TOKEN"]
 
-# 감시할 채널들
+# [광고 금지어 목록]
+ad_keywords = [
+    "#ad", "#광고", "유료광고", "소정의 고료", "레퍼럴", "가입링크", 
+    "수수료 할인", "거래소 가입", "증정금", "협찬", "파트너십", 
+    "Sponsored", "Promo", "referral", "register", "sign up"
+]
+
+# 감시할 채널들 (새로 추가한 채널 포함)
 source_channels = [
+    # === [기존 채널들] ===
     '@WeCryptoTogether', '@lnsanecoin', '@seaotterbtc', '@cryptomouseview', '@jammin0720',
     '@yobeullyANN', '@justdegenguy', '@moneygrid', '@tlsrltnf', '@doriworld', 
     '@Raoni1', '@airdropcosm', '@Gorae_gorae', '@dontworrymomcoinverygood', '@Edenitywl', 
@@ -37,8 +45,11 @@ source_channels = [
     '@overcrypto_doom', '@mdewstable', '@xiticle', '@danielsocialclub', '@chanelnameis', 
     '@CODE007_KR', '@whalemove_trade', '@Info_Arbitrage', '@bokjisaideashare', '@Info_Arbitrage', 
     '@subin_gamefi_lab', '@gorochidangi', '@kbc80', '@coin369369', '@gmrvillage', 
-    '@eastsouthwind', '@hyperliquid_announcements', '@catallactic', '@narockisrock1', '@househoneybee',
-    '@Web3LearningWithInger', '@Dove262', '@mujammin123', '@jh_6598', '@jueokman', '@c0wfarm', 
+    '@eastsouthwind',
+
+    # === [새로 추가된 채널들] ===
+    '@hyperliquid_announcements', '@narockisrock1', '@Web3LearningWithInger', 
+    '@Dove262', '@mujammin123', '@jh_6598', '@jueokman', '@c0wfarm'
 ]
 
 # 내 채널 (사람용 주소)
@@ -66,30 +77,35 @@ async def main():
         print(f"❌ 채널 찾기 실패: {e}")
         return
 
-    # 2. 최근 글 로딩 (중복 방지용: 50개까지 비교)
+    # 2. 최근 글 로딩
     recent_my_msgs = []
     async for msg in client.iter_messages(target_channel_username, limit=50):
         text = msg.message
         if text: 
-            # "Forwarded from:" 뒷부분(본문)만 잘라서 저장
             clean_text = text.split('\n\n', 1)[-1] if '\n\n' in text else text
             recent_my_msgs.append(clean_text)
 
     # 3. 뉴스 가져오기
     for channel in source_channels:
         try:
-            # === [핵심 수정 1] 탐색 범위를 5개 -> 30개로 대폭 증가 ===
             async for msg in client.iter_messages(channel, limit=30):
-                
-                # === [핵심 수정 2] 시간 제한을 20분 -> 6시간(21600초)으로 완화 ===
-                # 깃허브가 늦게 돌거나 밀려도 다 가져옵니다. 중복은 위에서 거르니까 안심하세요.
+                # 6시간 이내
                 time_diff = datetime.now(timezone.utc) - msg.date
-                if time_diff.total_seconds() > 21600: 
-                    continue
+                if time_diff.total_seconds() > 21600: continue
 
                 new_text = msg.message if msg.message else ""
                 
-                # 중복 검사 (이미 내 채널에 있는 내용은 패스)
+                # [광고 필터링]
+                is_ad = False
+                for keyword in ad_keywords:
+                    if keyword in new_text: 
+                        is_ad = True
+                        break
+                
+                if is_ad:
+                    continue
+
+                # 중복 검사
                 is_duplicate = False
                 for old_text in recent_my_msgs:
                     if old_text and is_similar(new_text, old_text):
@@ -97,18 +113,18 @@ async def main():
                         break
                 
                 if is_duplicate:
-                    continue # 중복이면 조용히 넘어감 (로그 생략해서 속도 향상)
+                    continue
 
                 # [전송]
                 try:
                     chat = await client.get_entity(channel)
                     source_name = chat.title
                     
-                    # 1. 링크 만들기
+                    # 링크 및 헤더 생성
                     username = channel.replace('@', '') 
                     post_link = f"https://t.me/{username}/{msg.id}"
                     
-                    # 2. 헤더 만들기
+                    # ↪️ Forwarded from: 채널명 (클릭가능)
                     header = f"↪️ Forwarded from: **[{source_name}]({post_link})**\n\n"
                     final_caption = header + new_text
                     
@@ -131,7 +147,6 @@ async def main():
                         )
                         print(f"SENT: {source_name} (텍스트)")
 
-                    # 방금 보낸 것도 중복 리스트에 즉시 추가 (같은 실행 주기 내 중복 방지)
                     if new_text: recent_my_msgs.append(new_text)
                     
                 except Exception as e:
