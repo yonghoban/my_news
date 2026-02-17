@@ -65,9 +65,9 @@ async def main():
         print(f"❌ 채널 찾기 실패: {e}")
         return
 
-    # 2. 최근 글 로딩 (헤더 제외하고 내용만 비교)
+    # 2. 최근 글 로딩 (중복 방지용: 50개까지 비교)
     recent_my_msgs = []
-    async for msg in client.iter_messages(target_channel_username, limit=30):
+    async for msg in client.iter_messages(target_channel_username, limit=50):
         text = msg.message
         if text: 
             # "Forwarded from:" 뒷부분(본문)만 잘라서 저장
@@ -77,14 +77,18 @@ async def main():
     # 3. 뉴스 가져오기
     for channel in source_channels:
         try:
-            async for msg in client.iter_messages(channel, limit=5):
-                # 20분 컷
+            # === [핵심 수정 1] 탐색 범위를 5개 -> 30개로 대폭 증가 ===
+            async for msg in client.iter_messages(channel, limit=30):
+                
+                # === [핵심 수정 2] 시간 제한을 20분 -> 6시간(21600초)으로 완화 ===
+                # 깃허브가 늦게 돌거나 밀려도 다 가져옵니다. 중복은 위에서 거르니까 안심하세요.
                 time_diff = datetime.now(timezone.utc) - msg.date
-                if time_diff.total_seconds() > 1200: continue
+                if time_diff.total_seconds() > 21600: 
+                    continue
 
                 new_text = msg.message if msg.message else ""
                 
-                # 중복 검사
+                # 중복 검사 (이미 내 채널에 있는 내용은 패스)
                 is_duplicate = False
                 for old_text in recent_my_msgs:
                     if old_text and is_similar(new_text, old_text):
@@ -92,24 +96,20 @@ async def main():
                         break
                 
                 if is_duplicate:
-                    print(f"PASS: 중복 ({channel})")
-                    continue
+                    continue # 중복이면 조용히 넘어감 (로그 생략해서 속도 향상)
 
                 # [전송]
                 try:
                     chat = await client.get_entity(channel)
                     source_name = chat.title
                     
-                    # === [디자인 수정 부분] ===
                     # 1. 링크 만들기
                     username = channel.replace('@', '') 
                     post_link = f"https://t.me/{username}/{msg.id}"
                     
-                    # 2. 헤더 만들기 (원하시는 스타일로 변경)
-                    # ↪️ Forwarded from: 채널명 (클릭가능)
+                    # 2. 헤더 만들기
                     header = f"↪️ Forwarded from: **[{source_name}]({post_link})**\n\n"
                     final_caption = header + new_text
-                    # ========================
                     
                     if msg.media:
                         file_path = await client.download_media(msg.media)
@@ -130,6 +130,7 @@ async def main():
                         )
                         print(f"SENT: {source_name} (텍스트)")
 
+                    # 방금 보낸 것도 중복 리스트에 즉시 추가 (같은 실행 주기 내 중복 방지)
                     if new_text: recent_my_msgs.append(new_text)
                     
                 except Exception as e:
