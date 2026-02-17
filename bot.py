@@ -37,7 +37,8 @@ source_channels = [
     '@overcrypto_doom', '@mdewstable', '@xiticle', '@danielsocialclub', '@chanelnameis', 
     '@CODE007_KR', '@whalemove_trade', '@Info_Arbitrage', '@bokjisaideashare', '@Info_Arbitrage', 
     '@subin_gamefi_lab', '@gorochidangi', '@kbc80', '@coin369369', '@gmrvillage', 
-    '@eastsouthwind'
+    '@eastsouthwind', '@hyperliquid_announcements', '@catallactic', '@narockisrock1', '@househoneybee',
+    '@Web3LearningWithInger', '@Dove262', '@mujammin123', '@jh_6598', '@jueokman', '@c0wfarm', 
 ]
 
 # 내 채널 (사람용 주소)
