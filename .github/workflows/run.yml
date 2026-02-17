@@ -2,7 +2,7 @@ name: Telegram Bot Run
 
 on:
   schedule:
-    - cron: '*/10 * * * *'  # 10분마다 실행 (원하면 숫자 변경 가능)
+    - cron: '*/15 * * * *'  # 15분마다 실행 (원하면 숫자 변경 가능)
   workflow_dispatch:      # 수동 실행 버튼 추가
 
 jobs:
