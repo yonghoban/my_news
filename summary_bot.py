@@ -3,6 +3,7 @@ import asyncio
 import re
 import requests
 import json
+import time # [추가] 시간 지연을 위해 필요
 from telethon import TelegramClient
 from telethon.sessions import StringSession
 from datetime import datetime, timezone
@@ -35,10 +36,15 @@ def fetch_content(url):
     except:
         return None
 
-# 2. [수정됨] AI 분석 (사용자 키에 맞는 2.0 Flash 사용)
+# 2. [수정됨] AI 분석 (무료 티어 호환성 강화)
 def ai_analyze(text, url_type="article"):
-    # 목록에 있는 'gemini-2.0-flash' 모델 사용
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={gemini_api_key}"
+    # 시도할 모델 순서 (무료 티어에서 확실한 것부터)
+    # gemini-flash-latest: 현재 사용 가능한 최신 무료 Flash 모델로 자동 연결됨
+    models = [
+        "gemini-flash-latest", 
+        "gemini-pro",
+        "gemini-1.5-flash-latest"
+    ]
     
     prompt = f"""
     You are a crypto market intelligence expert.
@@ -64,25 +70,28 @@ def ai_analyze(text, url_type="article"):
     payload = {"contents": [{"parts": [{"text": prompt}]}]}
     headers = {'Content-Type': 'application/json'}
 
-    try:
-        response = requests.post(url, headers=headers, data=json.dumps(payload), timeout=30)
-        
-        if response.status_code == 200:
-            return response.json()['candidates'][0]['content']['parts'][0]['text']
-        else:
-            # 혹시 2.0도 안 되면 2.0-flash-lite 시도 (백업)
-            print(f"⚠️ 2.0 Flash 실패 ({response.status_code}). Lite 모델 시도...")
-            backup_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key={gemini_api_key}"
-            backup_response = requests.post(backup_url, headers=headers, data=json.dumps(payload), timeout=30)
+    for model_name in models:
+        try:
+            print(f"🤖 모델 시도 중: {model_name}...")
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={gemini_api_key}"
             
-            if backup_response.status_code == 200:
-                 result = backup_response.json()
-                 return result['candidates'][0]['content']['parts'][0]['text']
+            response = requests.post(url, headers=headers, data=json.dumps(payload), timeout=30)
             
-            return f"⚠️ API 에러 ({response.status_code}): {response.text}"
-            
-    except Exception as e:
-        return f"⚠️ 연결 실패: {e}"
+            if response.status_code == 200:
+                return response.json()['candidates'][0]['content']['parts'][0]['text']
+            elif response.status_code == 429:
+                print(f"⚠️ {model_name} 사용량 초과 (429). 다음 모델 시도...")
+                time.sleep(2) # 2초 대기 후 다음 모델
+                continue
+            else:
+                print(f"⚠️ {model_name} 실패 ({response.status_code}).")
+                continue
+                
+        except Exception as e:
+            print(f"⚠️ 연결 실패: {e}")
+            continue
+
+    return "⚠️ 모든 AI 모델 분석 실패 (API 권한 또는 사용량 문제)"
 
 async def main():
     print("🧠 심층 분석 봇 가동...")
@@ -112,6 +121,10 @@ async def main():
                 target_url = urls[0]
                 content = fetch_content(target_url)
                 if not content: content = text 
+
+                # [중요] 429 에러 방지를 위해 5초 대기 (무료 티어는 분당 요청 제한이 있음)
+                print("⏳ AI 과부하 방지를 위해 5초 대기중...")
+                time.sleep(5)
 
                 summary = ai_analyze(content)
 
