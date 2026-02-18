@@ -3,7 +3,7 @@ import asyncio
 import re
 import requests
 import json
-import time # [추가] 시간 지연을 위해 필요
+import time
 from telethon import TelegramClient
 from telethon.sessions import StringSession
 from datetime import datetime, timezone
@@ -36,14 +36,15 @@ def fetch_content(url):
     except:
         return None
 
-# 2. [수정됨] AI 분석 (무료 티어 호환성 강화)
+# 2. [핵심 수정] AI 분석 (Lite 모델 우선 사용 + 에러 상세 출력)
 def ai_analyze(text, url_type="article"):
-    # 시도할 모델 순서 (무료 티어에서 확실한 것부터)
-    # gemini-flash-latest: 현재 사용 가능한 최신 무료 Flash 모델로 자동 연결됨
+    # 사용자 목록에 있던 모델들 중 '무료 가능성'이 높은 순서
     models = [
-        "gemini-flash-latest", 
-        "gemini-pro",
-        "gemini-1.5-flash-latest"
+        "gemini-2.0-flash-lite",       # 1순위: 2.0 경량화 버전 (가장 유력)
+        "gemini-2.0-flash-lite-preview-02-05", # 2순위: 프리뷰 버전
+        "gemini-flash-latest",         # 3순위: 자동 연결 (보통 1.5로 연결됨)
+        "gemini-1.5-flash",            # 4순위: 구형 안정 버전
+        "gemini-1.5-flash-8b"          # 5순위: 초경량 버전
     ]
     
     prompt = f"""
@@ -70,9 +71,12 @@ def ai_analyze(text, url_type="article"):
     payload = {"contents": [{"parts": [{"text": prompt}]}]}
     headers = {'Content-Type': 'application/json'}
 
+    last_error_msg = ""
+
     for model_name in models:
         try:
             print(f"🤖 모델 시도 중: {model_name}...")
+            # 2.0 모델은 v1beta 사용
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={gemini_api_key}"
             
             response = requests.post(url, headers=headers, data=json.dumps(payload), timeout=30)
@@ -80,18 +84,26 @@ def ai_analyze(text, url_type="article"):
             if response.status_code == 200:
                 return response.json()['candidates'][0]['content']['parts'][0]['text']
             elif response.status_code == 429:
-                print(f"⚠️ {model_name} 사용량 초과 (429). 다음 모델 시도...")
-                time.sleep(2) # 2초 대기 후 다음 모델
+                print(f"⚠️ {model_name} 사용량 초과 (429).")
+                last_error_msg = f"{model_name}: Quota Exceeded (429)"
+                time.sleep(2) 
+                continue
+            elif response.status_code == 404:
+                print(f"⚠️ {model_name} 모델 없음 (404).")
+                last_error_msg = f"{model_name}: Not Found (404)"
                 continue
             else:
-                print(f"⚠️ {model_name} 실패 ({response.status_code}).")
+                error_detail = response.text[:200] # 에러 내용 일부 추출
+                print(f"⚠️ {model_name} 실패 ({response.status_code}): {error_detail}")
+                last_error_msg = f"{model_name} Error: {response.status_code} - {error_detail}"
                 continue
                 
         except Exception as e:
-            print(f"⚠️ 연결 실패: {e}")
+            last_error_msg = f"Connection Error: {str(e)}"
             continue
 
-    return "⚠️ 모든 AI 모델 분석 실패 (API 권한 또는 사용량 문제)"
+    # 모든 시도가 실패하면 텔레그램으로 에러 내용 전송
+    return f"⚠️ 모든 AI 모델 분석 실패.\n마지막 에러: {last_error_msg}\n(API 키 결제 설정 확인이 필요할 수 있습니다)"
 
 async def main():
     print("🧠 심층 분석 봇 가동...")
@@ -122,7 +134,7 @@ async def main():
                 content = fetch_content(target_url)
                 if not content: content = text 
 
-                # [중요] 429 에러 방지를 위해 5초 대기 (무료 티어는 분당 요청 제한이 있음)
+                # 과부하 방지 대기
                 print("⏳ AI 과부하 방지를 위해 5초 대기중...")
                 time.sleep(5)
 
