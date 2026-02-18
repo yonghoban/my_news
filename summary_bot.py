@@ -2,10 +2,10 @@ import os
 import asyncio
 import re
 import requests
-import json
 from telethon import TelegramClient
 from telethon.sessions import StringSession
 from datetime import datetime, timezone, timedelta
+from google import genai  # [NEW] 최신 라이브러리
 
 # === [설정 영역] ===
 api_id = int(os.environ["API_ID"])
@@ -26,6 +26,9 @@ my_channel_username = '@turtleking11'
 client = TelegramClient(StringSession(session_string), api_id, api_hash)
 bot = TelegramClient('summary_bot_session', api_id, api_hash)
 
+# [NEW] 최신 Gemini 클라이언트 설정
+ai_client = genai.Client(api_key=gemini_api_key)
+
 # 1. Jina AI로 내용 읽기
 def fetch_content(url):
     print(f"🔍 링크 읽기 시도: {url}")
@@ -43,11 +46,8 @@ def fetch_content(url):
         print(f"❌ 읽기 에러: {e}")
         return None
 
-# 2. [변경됨] Gemini API 직접 호출 (라이브러리 미사용)
+# 2. AI 분석 (최신 라이브러리 사용)
 def ai_analyze(text, url_type="article"):
-    # 구글 서버 주소 (gemini-1.5-flash 모델 사용)
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_api_key}"
-    
     prompt = f"""
     You are a crypto market intelligence expert.
     Analyze the following content and provide a structured summary in Korean.
@@ -69,24 +69,15 @@ def ai_analyze(text, url_type="article"):
     {text}
     """
     
-    # 요청 데이터 만들기
-    payload = {
-        "contents": [{
-            "parts": [{"text": prompt}]
-        }]
-    }
-    headers = {'Content-Type': 'application/json'}
-
     try:
-        response = requests.post(url, headers=headers, data=json.dumps(payload), timeout=30)
-        if response.status_code == 200:
-            result = response.json()
-            # 응답에서 텍스트 추출
-            return result['candidates'][0]['content']['parts'][0]['text']
-        else:
-            return f"⚠️ API 호출 오류 ({response.status_code}): {response.text}"
+        # [NEW] google-genai 최신 호출 방식
+        response = ai_client.models.generate_content(
+            model='gemini-1.5-flash',
+            contents=prompt
+        )
+        return response.text
     except Exception as e:
-        return f"⚠️ 연결 실패: {e}"
+        return f"⚠️ AI 분석 실패: {e}"
 
 async def main():
     print("🧠 심층 분석 봇 가동...")
