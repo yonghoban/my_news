@@ -85,16 +85,12 @@ def ai_analyze(text, url_type="article"):
 # 3. 개인 메시지 처리
 async def process_private_messages(client, bot_username, my_channel_id):
     print(f"📩 @gangjaa님이 {bot_username}에게 보낸 메시지 확인 중...")
-    # 넉넉하게 4시간 전 메시지까지 확인 (혹시 봇이 오래 죽었을 때를 대비)
     check_limit = datetime.now(timezone.utc) - timedelta(hours=4) 
     
     async for msg in client.iter_messages(bot_username, limit=20):
         if msg.date < check_limit: break
         
         if msg.out and msg.text:
-            # [중복 방지] 이미 봇이 처리했는지 확인 (답장이 있으면 처리된 것)
-            # 여기서는 간단히 구현하지만, 원한다면 내 채널에 검색 로직 추가 가능
-            
             print(f"📝 메시지 발견: {msg.text[:15]}...")
             
             urls = re.findall(r'(https?://\S+)', msg.text)
@@ -117,19 +113,30 @@ async def process_private_messages(client, bot_username, my_channel_id):
             )
             
             await bot.send_message(my_channel_id, report_msg)
-            await bot.send_message(msg.chat_id, "✅ 분석 완료! 채널을 확인하세요.")
+            
+            # [수정] 봇이 답장 보낼 때 에러 발생 시 무시 (상대방이 봇으로 인식될 경우 대비)
+            try:
+                await bot.send_message(msg.chat_id, "✅ 분석 완료! 채널을 확인하세요.")
+            except:
+                pass 
+                
             await asyncio.sleep(5)
 
-# 4. [핵심 기능] 이미 게시된 링크인지 확인하는 함수
-async def get_posted_urls(bot, channel_id):
-    print("🧹 중복 방지를 위해 최근 게시물 확인 중...")
+# 4. [수정됨] 중복 확인 함수 (bot -> client로 변경)
+# 봇은 과거 내역 조회 권한이 없으므로, 사람 계정(client)이 확인합니다.
+async def get_posted_urls(client, channel_id):
+    print("🧹 중복 방지를 위해 최근 게시물 확인 중 (Client)...")
     posted_urls = set()
-    # 내 채널의 최근 50개 메시지를 확인해서 이미 올린 URL 수집
-    async for msg in bot.iter_messages(channel_id, limit=50):
-        if msg.text:
-            urls = re.findall(r'(https?://\S+)', msg.text)
-            if urls:
-                posted_urls.add(urls[0]) # 메시지에 포함된 첫 번째 링크 저장
+    try:
+        # bot 대신 client 사용
+        async for msg in client.iter_messages(channel_id, limit=50):
+            if msg.text:
+                urls = re.findall(r'(https?://\S+)', msg.text)
+                if urls:
+                    posted_urls.add(urls[0])
+    except Exception as e:
+        print(f"⚠️ 중복 확인 중 경고: {e}")
+        
     return posted_urls
 
 # 5. 메인 실행
@@ -153,19 +160,18 @@ async def main():
     except Exception as e:
         print(f"⚠️ 개인 메시지 처리 중: {e}")
 
-    # 2. [스마트 중복 방지] 내 채널에 이미 올린 링크 목록 가져오기
-    posted_urls = await get_posted_urls(bot, my_channel_id)
+    # 2. [수정됨] 중복 확인 시 'client' 객체 전달
+    # 이제 사람 계정이 내 채널을 훑어보므로 에러가 나지 않습니다.
+    posted_urls = await get_posted_urls(client, my_channel_id)
     print(f"🛡️ 이미 처리된 링크 {len(posted_urls)}개 제외 예정")
 
     # 3. 채널 스캔 (시간 범위 대폭 확대: 4시간)
-    # 봇이 3시간 동안 죽어있어도, 4시간 전 글까지 훑으므로 놓치는 게 없음
-    chk_time = 14400 # 4시간 (1시간 아님!)
+    chk_time = 14400 # 4시간
     
     for channel in target_channels:
         print(f"📡 {channel} 스캔 중...")
         try:
             async for msg in client.iter_messages(channel, limit=15):
-                # 4시간보다 오래된 건 무시
                 if (datetime.now(timezone.utc) - msg.date).total_seconds() > chk_time: continue
                 
                 text = msg.message if msg.message else ""
@@ -174,12 +180,10 @@ async def main():
                 if urls:
                     target_url = urls[0]
                     
-                    # [핵심] 이미 내 채널에 올린 링크면 분석하지 않고 건너뜀
                     if target_url in posted_urls:
                         print(f"⏩ 스킵 (이미 분석함): {target_url}")
                         continue
                     
-                    # 새로운 링크면 분석 시작
                     content = fetch_content(target_url)
                     if not content: content = text
                     
@@ -189,7 +193,6 @@ async def main():
                     final_msg = f"🔍 **[Simplex AI Report]**\n\n{summary}\n\n🔗 [원본]({target_url})\n출처: {channel}"
                     await bot.send_message(my_channel_id, final_msg, link_preview=False)
                     
-                    # 방금 올린 것도 중복 목록에 추가 (한 번의 실행 주기 내 중복 방지)
                     posted_urls.add(target_url)
 
         except Exception as e:
