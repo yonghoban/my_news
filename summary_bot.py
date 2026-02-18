@@ -10,7 +10,7 @@ session_string = os.environ["TELEGRAM_SESSION"]
 bot_token = os.environ["BOT_TOKEN"]
 gemini_api_key = os.environ["GEMINI_API_KEY"]
 
-target_channels = ['@cookiesreads', '@somoreads']
+target_channels = ['@cookiesreads', '@somoreads', '@iansintel']
 my_channel_username = '@turtleking11' 
 
 client = TelegramClient(StringSession(session_string), api_id, api_hash)
