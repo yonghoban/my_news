@@ -34,15 +34,15 @@ def fetch_content(url):
     except:
         return None
 
-# [핵심 수정] 사용자 JSON 목록에 있는 '정확한 이름'만 사용
+# [핵심 수정] 사용자 JSON 목록에 존재하는 'Lite' 및 '2.5' 모델만 사용
 def ai_analyze(text, url_type="article"):
-    # 1순위: 2.0 Flash Lite (무료 티어에서 가장 확률 높음)
-    # 2순위: Flash Latest (자동 연결)
-    # 3순위: Pro Latest (Flash가 막혔을 때 대안)
+    # 1순위: 2.0 Flash Lite (가볍고 무료 티어 넉넉함)
+    # 2순위: 2.5 Flash (목록에 있는 최신 모델)
+    # 3순위: Flash Lite Latest (자동 연결)
     models_to_try = [
         "gemini-2.0-flash-lite", 
-        "gemini-flash-latest",
-        "gemini-pro-latest"
+        "gemini-2.5-flash",
+        "gemini-flash-lite-latest"
     ]
     
     prompt = f"""
@@ -69,12 +69,12 @@ def ai_analyze(text, url_type="article"):
     payload = {"contents": [{"parts": [{"text": prompt}]}]}
     headers = {'Content-Type': 'application/json'}
 
-    error_logs = [] # 모든 에러를 기록
+    error_logs = [] 
 
     for model_name in models_to_try:
         try:
             print(f"🤖 모델 시도: {model_name}...")
-            # v1beta 사용 (최신 모델용)
+            # v1beta 사용
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={gemini_api_key}"
             
             response = requests.post(url, headers=headers, data=json.dumps(payload), timeout=30)
@@ -83,16 +83,14 @@ def ai_analyze(text, url_type="article"):
                 return response.json()['candidates'][0]['content']['parts'][0]['text']
             
             elif response.status_code == 429:
-                # 사용량 초과 시 3초 대기 후 다음 모델
-                msg = f"⚠️ {model_name}: 429 (Quota Exceeded)"
+                msg = f"⚠️ {model_name}: 429 (사용량 초과)"
                 print(msg)
                 error_logs.append(msg)
-                time.sleep(3)
+                time.sleep(2)
                 continue
             
             else:
-                # 그 외 에러 (404 등)
-                msg = f"⚠️ {model_name}: {response.status_code} ({response.text[:50]}...)"
+                msg = f"⚠️ {model_name}: {response.status_code}"
                 print(msg)
                 error_logs.append(msg)
                 continue
@@ -102,9 +100,8 @@ def ai_analyze(text, url_type="article"):
             error_logs.append(msg)
             continue
 
-    # 3개 다 실패하면 실패 사유 리스트를 전송
     error_summary = "\n".join(error_logs)
-    return f"⚠️ 분석 실패 (모든 모델 오류)\n\n[에러 로그]\n{error_summary}"
+    return f"⚠️ 분석 실패 (모든 모델 오류)\n\n[로그]\n{error_summary}"
 
 async def main():
     print("🧠 심층 분석 봇 가동...")
