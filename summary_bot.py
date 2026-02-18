@@ -2,10 +2,10 @@ import os
 import asyncio
 import re
 import requests
+import json
 from telethon import TelegramClient
 from telethon.sessions import StringSession
-from datetime import datetime, timezone, timedelta
-from google import genai  # [NEW] 최신 라이브러리
+from datetime import datetime, timezone
 
 # === [설정 영역] ===
 api_id = int(os.environ["API_ID"])
@@ -26,9 +26,6 @@ my_channel_username = '@turtleking11'
 client = TelegramClient(StringSession(session_string), api_id, api_hash)
 bot = TelegramClient('summary_bot_session', api_id, api_hash)
 
-# [NEW] 최신 Gemini 클라이언트 설정
-ai_client = genai.Client(api_key=gemini_api_key)
-
 # 1. Jina AI로 내용 읽기
 def fetch_content(url):
     print(f"🔍 링크 읽기 시도: {url}")
@@ -46,8 +43,16 @@ def fetch_content(url):
         print(f"❌ 읽기 에러: {e}")
         return None
 
-# 2. AI 분석 (최신 라이브러리 사용)
+# 2. [핵심 수정] AI 분석 (3단 재시도 로직)
 def ai_analyze(text, url_type="article"):
+    # 시도할 모델 목록 (우선순위 순)
+    models_to_try = [
+        "gemini-1.5-flash",          # 1순위: 기본
+        "gemini-1.5-flash-latest",   # 2순위: 최신 별칭
+        "gemini-1.0-pro",            # 3순위: 구형 안정 버전 (최후의 보루)
+        "gemini-pro"                 # 4순위: 레거시
+    ]
+
     prompt = f"""
     You are a crypto market intelligence expert.
     Analyze the following content and provide a structured summary in Korean.
@@ -69,15 +74,36 @@ def ai_analyze(text, url_type="article"):
     {text}
     """
     
-    try:
-        # [NEW] google-genai 최신 호출 방식
-        response = ai_client.models.generate_content(
-            model='gemini-1.5-flash',
-            contents=prompt
-        )
-        return response.text
-    except Exception as e:
-        return f"⚠️ AI 분석 실패: {e}"
+    payload = {
+        "contents": [{"parts": [{"text": prompt}]}]
+    }
+    headers = {'Content-Type': 'application/json'}
+
+    # 모델들을 하나씩 순서대로 시도
+    last_error = ""
+    for model_name in models_to_try:
+        try:
+            print(f"🤖 AI 시도 중: {model_name}...")
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={gemini_api_key}"
+            
+            response = requests.post(url, headers=headers, data=json.dumps(payload), timeout=30)
+            
+            if response.status_code == 200:
+                result = response.json()
+                # 성공하면 바로 결과 반환하고 종료
+                return result['candidates'][0]['content']['parts'][0]['text']
+            else:
+                print(f"⚠️ {model_name} 실패 ({response.status_code})")
+                last_error = response.text
+                continue # 다음 모델 시도
+
+        except Exception as e:
+            print(f"⚠️ {model_name} 에러: {e}")
+            last_error = str(e)
+            continue
+
+    # 모든 모델이 실패했을 경우
+    return f"⚠️ 모든 AI 모델 분석 실패.\n마지막 에러: {last_error}"
 
 async def main():
     print("🧠 심층 분석 봇 가동...")
@@ -98,7 +124,6 @@ async def main():
     for channel in target_channels:
         try:
             print(f"📡 스캔 중: {channel}")
-            # 최근 10개 확인
             async for msg in client.iter_messages(channel, limit=10):
                 time_diff = datetime.now(timezone.utc) - msg.date
                 if time_diff.total_seconds() > chk_time: continue
@@ -109,7 +134,6 @@ async def main():
 
                 target_url = urls[0]
                 
-                # 내용 읽기
                 content = fetch_content(target_url)
                 if not content:
                     print("⚠️ 원문 읽기 실패 -> 메시지 본문 사용")
@@ -118,11 +142,9 @@ async def main():
                 else:
                     url_type = "article"
 
-                # AI 분석
-                print("🤖 AI 분석 중...")
+                # AI 분석 호출
                 summary = ai_analyze(content, url_type)
 
-                # 전송
                 final_msg = f"🔍 **[Simplex AI Report]**\n\n{summary}\n\n🔗 [원본 링크]({target_url})\n출처: {channel}"
                 await bot.send_message(my_channel_id, final_msg, link_preview=False)
                 print(f"✅ 전송 완료: {target_url}")
