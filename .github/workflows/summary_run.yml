@@ -1,0 +1,35 @@
+name: Summary Bot Run
+
+on:
+  schedule:
+    # 매 시간 15분에 실행 (1시간 간격)
+    # 1시 15분, 2시 15분, 3시 15분... 이렇게 돌아갑니다.
+    - cron: '15 * * * *'
+  workflow_dispatch:      # 수동 실행 버튼 추가
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.9'
+
+      - name: Install libraries
+        # Jina AI, Gemini, Telethon 등 필요한 도구 설치
+        run: |
+          pip install telethon requests google-generativeai beautifulsoup4
+
+      - name: Run Summary Bot
+        env:
+          # 기존에 등록했던 비밀번호들을 그대로 가져와서 씁니다 (편리함!)
+          API_ID: ${{ secrets.API_ID }}
+          API_HASH: ${{ secrets.API_HASH }}
+          TELEGRAM_SESSION: ${{ secrets.TELEGRAM_SESSION }}
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python summary_bot.py
