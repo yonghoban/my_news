@@ -14,17 +14,13 @@ session_string = os.environ["TELEGRAM_SESSION"]
 bot_token = os.environ["BOT_TOKEN"]
 gemini_api_key = os.environ["GEMINI_API_KEY"]
 
-# 1. 분석할 대상 채널 (영어 뉴스/트윗이 올라오는 곳)
-# 여기에 감시하고 싶은 채널들을 계속 추가하세요.
+# 1. [핵심 수정] 감시할 소스 채널 목록
 target_channels = [
-    '@VitalikButerin', 
-    '@BanklessHQ',
-    '@Tree_of_Alpha',
-    '@tier10k',
-    '@unusual_whales'
+    '@cookiesreads',
+    '@somoreads'
 ]
 
-# 2. [수정됨] 결과물을 받아볼 내 새 채널
+# 2. 결과물을 받아볼 내 채널 (요약본 받는 곳)
 my_channel_username = '@turtleking11' 
 
 # === [AI 설정] ===
@@ -38,7 +34,7 @@ bot = TelegramClient('summary_bot_session', api_id, api_hash)
 def fetch_content(url):
     print(f"🔍 링크 읽기 시도: {url}")
     try:
-        # Jina Reader API (무료)
+        # Jina Reader API (무료) 사용
         reader_url = f"https://r.jina.ai/{url}"
         headers = {
             'X-Return-Format': 'markdown',
@@ -48,10 +44,10 @@ def fetch_content(url):
         
         if response.status_code == 200:
             text = response.text
-            # 차단되었거나 내용이 너무 짧으면 실패 처리
+            # 차단되었거나 내용이 너무 짧으면(50자 미만) 실패 처리
             if "Access Denied" in text or len(text) < 50:
                 return None
-            return text[:6000] # Gemini 입력 한계 고려
+            return text[:6000] # Gemini 입력 한계 고려 (너무 길면 자름)
         else:
             return None
     except Exception as e:
@@ -72,10 +68,10 @@ def ai_analyze(text, url_type="article"):
 
     **2. 핵심 내용 (Key Points)**
     - (Bullet points, 3 lines max)
-    - (Translate technical terms to Korean)
+    - (Translate technical terms to Korean naturally)
 
-    **3. 시장 영향 (Impact)**
-    - (Positive/Negative/Neutral and why)
+    **3. 인사이트 (Insight)**
+    - (What is the implication for the crypto market? Positive/Negative/Neutral)
 
     [Source Content]
     {text}
@@ -91,10 +87,9 @@ async def main():
     await client.start()
     await bot.start(bot_token=bot_token)
 
-    # 내 새 채널 ID 찾기 (@turtleking11)
+    # 내 채널(@turtleking11) ID 찾기
     try:
         entity = await client.get_entity(my_channel_username)
-        # 채널 ID는 보통 -100으로 시작합니다.
         my_channel_id = int(f"-100{entity.id}")
         print(f"✅ 전송 타겟: {my_channel_username} (ID: {my_channel_id})")
     except Exception as e:
@@ -110,7 +105,7 @@ async def main():
             print(f"📡 스캔 중: {channel}")
             # 너무 많이 읽으면 느려지니 최근 5개만 확인
             async for msg in client.iter_messages(channel, limit=5):
-                # 시간 체크
+                # 시간 체크 (1시간 이내 글만)
                 time_diff = datetime.now(timezone.utc) - msg.date
                 if time_diff.total_seconds() > chk_time: continue
 
@@ -125,7 +120,7 @@ async def main():
                 # 1. 내용 읽기 (Scraping)
                 content = fetch_content(target_url)
                 
-                # 2. 내용 없으면 텔레그램 본문 사용
+                # 2. 내용 없으면 텔레그램 본문 사용 (Jina 실패 시 대비)
                 if not content:
                     print("⚠️ 원문 읽기 실패 -> 메시지 본문으로 분석")
                     content = text 
