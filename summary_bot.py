@@ -2,7 +2,7 @@ import os
 import asyncio
 import re
 import requests
-import google.generativeai as genai
+import json
 from telethon import TelegramClient
 from telethon.sessions import StringSession
 from datetime import datetime, timezone, timedelta
@@ -23,16 +23,10 @@ target_channels = [
 # 결과 받을 채널
 my_channel_username = '@turtleking11' 
 
-# === [AI 설정 수정됨] ===
-genai.configure(api_key=gemini_api_key)
-# 기존 'gemini-pro'는 구형이라 404 에러가 발생합니다.
-# 최신형 'gemini-1.5-flash'로 변경합니다. (더 빠르고 무료입니다)
-model = genai.GenerativeModel('gemini-1.5-flash')
-
 client = TelegramClient(StringSession(session_string), api_id, api_hash)
 bot = TelegramClient('summary_bot_session', api_id, api_hash)
 
-# Jina AI 읽기
+# 1. Jina AI로 내용 읽기
 def fetch_content(url):
     print(f"🔍 링크 읽기 시도: {url}")
     try:
@@ -49,8 +43,11 @@ def fetch_content(url):
         print(f"❌ 읽기 에러: {e}")
         return None
 
-# AI 분석
+# 2. [변경됨] Gemini API 직접 호출 (라이브러리 미사용)
 def ai_analyze(text, url_type="article"):
+    # 구글 서버 주소 (gemini-1.5-flash 모델 사용)
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_api_key}"
+    
     prompt = f"""
     You are a crypto market intelligence expert.
     Analyze the following content and provide a structured summary in Korean.
@@ -71,18 +68,25 @@ def ai_analyze(text, url_type="article"):
     [Source Content]
     {text}
     """
+    
+    # 요청 데이터 만들기
+    payload = {
+        "contents": [{
+            "parts": [{"text": prompt}]
+        }]
+    }
+    headers = {'Content-Type': 'application/json'}
+
     try:
-        # 안전 설정 해제 (가끔 암호화폐 용어를 유해하다고 오판하는 것 방지)
-        safety_settings = [
-            {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
-            {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
-            {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
-            {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
-        ]
-        response = model.generate_content(prompt, safety_settings=safety_settings)
-        return response.text
+        response = requests.post(url, headers=headers, data=json.dumps(payload), timeout=30)
+        if response.status_code == 200:
+            result = response.json()
+            # 응답에서 텍스트 추출
+            return result['candidates'][0]['content']['parts'][0]['text']
+        else:
+            return f"⚠️ API 호출 오류 ({response.status_code}): {response.text}"
     except Exception as e:
-        return f"⚠️ AI 분석 실패: {e}"
+        return f"⚠️ 연결 실패: {e}"
 
 async def main():
     print("🧠 심층 분석 봇 가동...")
@@ -97,13 +101,13 @@ async def main():
         print(f"❌ 채널 찾기 실패: {e}")
         return
 
-    # 24시간(하루) 전 글까지 확인
+    # 24시간 이내 글 확인
     chk_time = 86400 
 
     for channel in target_channels:
         try:
             print(f"📡 스캔 중: {channel}")
-            # 최근 10개까지 확인
+            # 최근 10개 확인
             async for msg in client.iter_messages(channel, limit=10):
                 time_diff = datetime.now(timezone.utc) - msg.date
                 if time_diff.total_seconds() > chk_time: continue
