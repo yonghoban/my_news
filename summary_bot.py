@@ -43,16 +43,12 @@ def fetch_content(url):
         print(f"❌ 읽기 에러: {e}")
         return None
 
-# 2. [핵심 수정] AI 분석 (3단 재시도 로직)
+# 2. [최종 수정] AI 분석 (안정적인 v1 버전 사용)
 def ai_analyze(text, url_type="article"):
-    # 시도할 모델 목록 (우선순위 순)
-    models_to_try = [
-        "gemini-1.5-flash",          # 1순위: 기본
-        "gemini-1.5-flash-latest",   # 2순위: 최신 별칭
-        "gemini-1.0-pro",            # 3순위: 구형 안정 버전 (최후의 보루)
-        "gemini-pro"                 # 4순위: 레거시
-    ]
-
+    # v1 (정식 버전) 주소 사용
+    # gemini-pro는 가장 기본 모델이라 웬만하면 404가 안 뜹니다.
+    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key={gemini_api_key}"
+    
     prompt = f"""
     You are a crypto market intelligence expert.
     Analyze the following content and provide a structured summary in Korean.
@@ -79,31 +75,27 @@ def ai_analyze(text, url_type="article"):
     }
     headers = {'Content-Type': 'application/json'}
 
-    # 모델들을 하나씩 순서대로 시도
-    last_error = ""
-    for model_name in models_to_try:
-        try:
-            print(f"🤖 AI 시도 중: {model_name}...")
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={gemini_api_key}"
+    try:
+        # v1 endpoint 호출
+        response = requests.post(url, headers=headers, data=json.dumps(payload), timeout=30)
+        
+        if response.status_code == 200:
+            result = response.json()
+            return result['candidates'][0]['content']['parts'][0]['text']
+        else:
+            # v1 실패 시 v1beta의 1.5-flash 시도 (백업)
+            print(f"⚠️ v1 gemini-pro 실패 ({response.status_code}). 백업 모델 시도...")
+            backup_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={gemini_api_key}"
+            backup_response = requests.post(backup_url, headers=headers, data=json.dumps(payload), timeout=30)
             
-            response = requests.post(url, headers=headers, data=json.dumps(payload), timeout=30)
+            if backup_response.status_code == 200:
+                 result = backup_response.json()
+                 return result['candidates'][0]['content']['parts'][0]['text']
             
-            if response.status_code == 200:
-                result = response.json()
-                # 성공하면 바로 결과 반환하고 종료
-                return result['candidates'][0]['content']['parts'][0]['text']
-            else:
-                print(f"⚠️ {model_name} 실패 ({response.status_code})")
-                last_error = response.text
-                continue # 다음 모델 시도
-
-        except Exception as e:
-            print(f"⚠️ {model_name} 에러: {e}")
-            last_error = str(e)
-            continue
-
-    # 모든 모델이 실패했을 경우
-    return f"⚠️ 모든 AI 모델 분석 실패.\n마지막 에러: {last_error}"
+            return f"⚠️ API 호출 오류 ({response.status_code}): {response.text}"
+            
+    except Exception as e:
+        return f"⚠️ 연결 실패: {e}"
 
 async def main():
     print("🧠 심층 분석 봇 가동...")
