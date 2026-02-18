@@ -23,9 +23,11 @@ target_channels = [
 # 결과 받을 채널
 my_channel_username = '@turtleking11' 
 
-# AI 설정
+# === [AI 설정 수정됨] ===
 genai.configure(api_key=gemini_api_key)
-model = genai.GenerativeModel('gemini-pro')
+# 기존 'gemini-pro'는 구형이라 404 에러가 발생합니다.
+# 최신형 'gemini-1.5-flash'로 변경합니다. (더 빠르고 무료입니다)
+model = genai.GenerativeModel('gemini-1.5-flash')
 
 client = TelegramClient(StringSession(session_string), api_id, api_hash)
 bot = TelegramClient('summary_bot_session', api_id, api_hash)
@@ -70,7 +72,14 @@ def ai_analyze(text, url_type="article"):
     {text}
     """
     try:
-        response = model.generate_content(prompt)
+        # 안전 설정 해제 (가끔 암호화폐 용어를 유해하다고 오판하는 것 방지)
+        safety_settings = [
+            {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+        ]
+        response = model.generate_content(prompt, safety_settings=safety_settings)
         return response.text
     except Exception as e:
         return f"⚠️ AI 분석 실패: {e}"
@@ -88,21 +97,16 @@ async def main():
         print(f"❌ 채널 찾기 실패: {e}")
         return
 
-    # === [수정된 부분] ===
-    # 24시간(하루) 전 글까지 확인합니다.
+    # 24시간(하루) 전 글까지 확인
     chk_time = 86400 
 
     for channel in target_channels:
         try:
             print(f"📡 스캔 중: {channel}")
-            # 최근 10개까지 넉넉하게 확인
+            # 최근 10개까지 확인
             async for msg in client.iter_messages(channel, limit=10):
-                # 시간 체크
                 time_diff = datetime.now(timezone.utc) - msg.date
-                if time_diff.total_seconds() > chk_time: 
-                    # 너무 오래된 글은 패스하지만, 로그로 남김
-                    # print(f"  - 너무 오래된 글 패스 ({time_diff})")
-                    continue
+                if time_diff.total_seconds() > chk_time: continue
 
                 text = msg.message if msg.message else ""
                 urls = re.findall(r'(https?://\S+)', text)
