@@ -15,39 +15,30 @@ bot_token = os.environ["BOT_TOKEN"]
 gemini_api_key = os.environ["GEMINI_API_KEY"]
 
 # 감시할 채널
-target_channels = [
-    '@cookiesreads',
-    '@somoreads'
-]
-
-# 결과 받을 채널
+target_channels = ['@cookiesreads', '@somoreads']
 my_channel_username = '@turtleking11' 
 
 client = TelegramClient(StringSession(session_string), api_id, api_hash)
 bot = TelegramClient('summary_bot_session', api_id, api_hash)
 
-# 1. Jina AI로 내용 읽기
+# 1. Jina AI 읽기
 def fetch_content(url):
-    print(f"🔍 링크 읽기 시도: {url}")
     try:
         reader_url = f"https://r.jina.ai/{url}"
         headers = {'X-Return-Format': 'markdown', 'X-With-Generated-Alt': 'true'}
         response = requests.get(reader_url, headers=headers, timeout=20)
-        
         if response.status_code == 200:
             text = response.text
             if "Access Denied" in text or len(text) < 50: return None
             return text[:6000]
         return None
-    except Exception as e:
-        print(f"❌ 읽기 에러: {e}")
+    except:
         return None
 
-# 2. [최종 수정] AI 분석 (안정적인 v1 버전 사용)
+# 2. [수정됨] AI 분석 (사용자 키에 맞는 2.0 Flash 사용)
 def ai_analyze(text, url_type="article"):
-    # v1 (정식 버전) 주소 사용
-    # gemini-pro는 가장 기본 모델이라 웬만하면 404가 안 뜹니다.
-    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key={gemini_api_key}"
+    # 목록에 있는 'gemini-2.0-flash' 모델 사용
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={gemini_api_key}"
     
     prompt = f"""
     You are a crypto market intelligence expert.
@@ -70,29 +61,25 @@ def ai_analyze(text, url_type="article"):
     {text}
     """
     
-    payload = {
-        "contents": [{"parts": [{"text": prompt}]}]
-    }
+    payload = {"contents": [{"parts": [{"text": prompt}]}]}
     headers = {'Content-Type': 'application/json'}
 
     try:
-        # v1 endpoint 호출
         response = requests.post(url, headers=headers, data=json.dumps(payload), timeout=30)
         
         if response.status_code == 200:
-            result = response.json()
-            return result['candidates'][0]['content']['parts'][0]['text']
+            return response.json()['candidates'][0]['content']['parts'][0]['text']
         else:
-            # v1 실패 시 v1beta의 1.5-flash 시도 (백업)
-            print(f"⚠️ v1 gemini-pro 실패 ({response.status_code}). 백업 모델 시도...")
-            backup_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={gemini_api_key}"
+            # 혹시 2.0도 안 되면 2.0-flash-lite 시도 (백업)
+            print(f"⚠️ 2.0 Flash 실패 ({response.status_code}). Lite 모델 시도...")
+            backup_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key={gemini_api_key}"
             backup_response = requests.post(backup_url, headers=headers, data=json.dumps(payload), timeout=30)
             
             if backup_response.status_code == 200:
                  result = backup_response.json()
                  return result['candidates'][0]['content']['parts'][0]['text']
             
-            return f"⚠️ API 호출 오류 ({response.status_code}): {response.text}"
+            return f"⚠️ API 에러 ({response.status_code}): {response.text}"
             
     except Exception as e:
         return f"⚠️ 연결 실패: {e}"
@@ -105,9 +92,7 @@ async def main():
     try:
         entity = await client.get_entity(my_channel_username)
         my_channel_id = int(f"-100{entity.id}")
-        print(f"✅ 전송 타겟: {my_channel_username} (ID: {my_channel_id})")
-    except Exception as e:
-        print(f"❌ 채널 찾기 실패: {e}")
+    except:
         return
 
     # 24시간 이내 글 확인
@@ -125,24 +110,17 @@ async def main():
                 if not urls: continue 
 
                 target_url = urls[0]
-                
                 content = fetch_content(target_url)
-                if not content:
-                    print("⚠️ 원문 읽기 실패 -> 메시지 본문 사용")
-                    content = text 
-                    url_type = "short_text"
-                else:
-                    url_type = "article"
+                if not content: content = text 
 
-                # AI 분석 호출
-                summary = ai_analyze(content, url_type)
+                summary = ai_analyze(content)
 
-                final_msg = f"🔍 **[Simplex AI Report]**\n\n{summary}\n\n🔗 [원본 링크]({target_url})\n출처: {channel}"
+                final_msg = f"🔍 **[Simplex AI Report]**\n\n{summary}\n\n🔗 [원본]({target_url})\n출처: {channel}"
                 await bot.send_message(my_channel_id, final_msg, link_preview=False)
-                print(f"✅ 전송 완료: {target_url}")
+                print(f"✅ 완료: {target_url}")
 
         except Exception as e:
-            print(f"에러 ({channel}): {e}")
+            print(f"에러: {e}")
 
 with client:
     client.loop.run_until_complete(main())
