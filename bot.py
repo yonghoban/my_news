@@ -8,7 +8,8 @@ from datetime import datetime, timezone
 # === [설정 영역] ===
 api_id = int(os.environ["API_ID"])
 api_hash = os.environ["API_HASH"]
-session_string = os.environ["TELEGRAM_SESSION"]
+# [수정] 1번 세션 키를 주입받도록 변수명 변경 (다중 접속 충돌 방지)
+session_string = os.environ["TELEGRAM_SESSION_1"]
 bot_token = os.environ["BOT_TOKEN"]
 
 # [광고 금지어 목록]
@@ -64,7 +65,6 @@ def normalize_text(text):
 
 def is_similar(text1, text2, threshold=0.90):
     if not text1 or not text2: return False
-    # 정규화된 텍스트로 비교 (더 정확함)
     norm1 = normalize_text(text1)
     norm2 = normalize_text(text2)
     return SequenceMatcher(None, norm1, norm2).ratio() >= threshold
@@ -85,13 +85,10 @@ async def main():
 
     # 2. 최근 글 로딩 (기억력 4배 강화: 200개)
     recent_my_msgs = []
-    # limit=200 으로 늘려서 놓치는 중복이 없도록 함
     async for msg in client.iter_messages(target_channel_username, limit=200):
         text = msg.message
         if text: 
-            # 헤더(Forwarded from...) 제거하고 본문만 추출
             if '\n\n' in text:
-                # 첫 번째 줄바꿈 이후가 본문일 확률이 높음
                 clean_text = text.split('\n\n', 1)[-1]
             else:
                 clean_text = text
@@ -101,7 +98,6 @@ async def main():
     for channel in source_channels:
         try:
             async for msg in client.iter_messages(channel, limit=30):
-                # 6시간 이내
                 time_diff = datetime.now(timezone.utc) - msg.date
                 if time_diff.total_seconds() > 21600: continue
 
@@ -116,18 +112,14 @@ async def main():
                 if is_ad: continue
 
                 # [중복 검사]
-                # 텍스트가 아예 없으면(사진만 있으면) 중복 체크가 어려워 패스할 수도 있으나,
-                # 일단 텍스트가 있는 경우만 철저히 검사
                 if not new_text.strip():
-                    continue # 캡션 없는 이미지는 중복 위험이 커서 일단 건너뜀 (안전빵)
+                    continue
 
                 is_duplicate = False
                 for old_text in recent_my_msgs:
-                    # 1. 완전히 똑같은 경우 (빠른 처리)
                     if new_text in old_text: 
                         is_duplicate = True
                         break
-                    # 2. 90% 이상 비슷한 경우 (미세한 차이)
                     if is_similar(new_text, old_text):
                         is_duplicate = True
                         break
@@ -148,15 +140,28 @@ async def main():
                     
                     if msg.media:
                         file_path = await client.download_media(msg.media)
-                        await bot.send_message(
-                            real_bot_id,
-                            final_caption,
-                            file=file_path,
-                            link_preview=False 
-                        )
+                        
+                        # [수정] 미디어 캡션 길이 우회 로직 이식
+                        if len(final_caption) <= 1000:
+                            # 1000자 이하: 기존처럼 사진과 글을 한 번에 전송
+                            await bot.send_message(
+                                real_bot_id,
+                                final_caption,
+                                file=file_path,
+                                link_preview=False 
+                            )
+                        else:
+                            # 1000자 초과: 사진 선행 전송 후 텍스트 별도 전송
+                            await bot.send_message(real_bot_id, file=file_path)
+                            await bot.send_message(
+                                real_bot_id,
+                                final_caption,
+                                link_preview=False
+                            )
+                            
                         if os.path.exists(file_path):
                             os.remove(file_path)
-                        print(f"SENT: {source_name} (미디어)")
+                        print(f"SENT: {source_name} (미디어 처리 완료)")
                     else:
                         await bot.send_message(
                             real_bot_id, 
