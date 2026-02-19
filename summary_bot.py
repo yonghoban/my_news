@@ -58,31 +58,33 @@ def fetch_content(url):
     except:
         return None
 
-# 2. Gemini AI 분석
+# 2. Gemini AI 분석 (인과관계 및 구조적 설명 모델 적용)
 def ai_analyze(text, url_type="article"):
     models = ["gemini-2.0-flash-lite", "gemini-2.5-flash", "gemini-flash-lite-latest"]
     
     prompt = f"""
-    You are a senior crypto investment analyst. 
-    Analyze the following content based on fact-based and quantitative principles.
+    You are a strictly objective and logical crypto analyst.
+    Your goal is to explain complex crypto news logically and easily, focusing on causality, first principles, and second-order effects.
+    
+    [Rules]
+    1. Output STRICTLY in Korean.
+    2. Eliminate all subjective adjectives. Use only facts, quantitative data, and logical deductions.
+    3. End all sentences with noun forms (명사형 종결 - 예: ~함, ~임, ~상태).
+    4. Separate verifiable facts from analytical implications.
+    5. Explain complex concepts (e.g., Tokenomics, DeFi mechanisms) so that beginners can understand the structural cause.
 
     [Output Format]
-    **1. 한줄 요약 (Headline)**
-    - 핵심 사건 중심의 간결하고 직설적인 요약
+    ### 1. 사건 개요 및 작동 원리 (Event & Mechanism)
+    * **발생 현상 (Fact)**: (핵심 사건과 정량적 변화 수치 기술)
+    * **발생 원리 (Causality)**: (해당 사건이 발생한 근본 원인과 시스템적 작동 원리를 쉽게 기술)
 
-    **2. 핵심 내용 (Key Points)**
-    - 주요 사실 관계 3가지 이내 (수치, 통계 등 정량 데이터 우선 기술)
+    ### 2. 구조적 분석 및 2차 파급 효과 (Structure & 2nd-order Effects)
+    * **데이터 현황 (Data)**: (관련 온체인 데이터, 유동성 집중도, 규제 등 객관적 현황)
+    * **예상 파급 효과 (Impact)**: (위 데이터로 인해 발생 가능한 연쇄 효과 및 하방 리스크. '만약 ~라면, ~게 된다' 형태의 논리 전개)
 
-    **3. 시장 영향 및 예상 가격 범위 (Price Impact & Range)**
-    - 뉴스의 파급력을 바탕으로 한 단기 예상 변동성(%) 및 주요 지지/저항 가격대 추정
-    - 일반 뉴스인 경우 시장 심리(Bullish/Bearish) 및 자금 흐름에 미치는 영향 분석
-
-    **4. 위험 요소 및 보안 취약점 (Risk Factors)**
-    - **DeFi/신규 프로젝트 필수**: 스마트 컨트랙트 감사 여부, 유동성 집중도, 팀 익명성 등 분석
-    - 일반 뉴스의 경우 잠재적 하방 리스크 및 예외 상황(Edge cases) 기술
-
-    **5. 최종 인사이트 (Insight)**
-    - 2차 효과(Second-order effects) 및 투자 전략적 제언
+    ### 3. 시장 교차 분석 및 관찰점 (Macro Context & Insight)
+    * **거시 환경 연동 (Macro)**: (비트코인 등 거시 지표 또는 전체 자본 흐름과의 상관관계)
+    * **핵심 모니터링 지표 (Insight)**: (향후 방향성을 결정지을 정량적 관찰 대상 및 지지/저항 데이터)
 
     [Source Content]
     {text}
