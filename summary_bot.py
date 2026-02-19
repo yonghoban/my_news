@@ -11,7 +11,8 @@ from datetime import datetime, timezone, timedelta
 # === [설정 영역] ===
 api_id = int(os.environ["API_ID"])
 api_hash = os.environ["API_HASH"]
-session_string = os.environ["TELEGRAM_SESSION"]
+# [수정] 2번 세션 키를 주입받도록 변수명 변경 (다중 접속 충돌 방지)
+session_string = os.environ["TELEGRAM_SESSION_2"]
 bot_token = os.environ["BOT_TOKEN"]
 gemini_api_key = os.environ["GEMINI_API_KEY"]
 
