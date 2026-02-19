@@ -21,9 +21,31 @@ my_channel_username = '@turtleking11'
 client = TelegramClient(StringSession(session_string), api_id, api_hash)
 bot = TelegramClient('summary_bot_session', api_id, api_hash)
 
-# 1. 링크 내용 가져오기
+# 1. 링크 내용 추출 (FxTwitter 및 Jina AI 이중 파이프라인)
 def fetch_content(url):
-    print(f"🔍 링크 읽기 시도: {url}")
+    print(f"🔍 링크 파싱 시도: {url}")
+    
+    # [분기 1] 트위터 우회 라우팅 (FxTwitter API)
+    if "twitter.com" in url or "x.com" in url:
+        api_url = re.sub(r'(https?://)?(www\.)?(twitter\.com|x\.com)', 'https://api.fxtwitter.com', url)
+        try:
+            response = requests.get(api_url, timeout=15)
+            if response.status_code == 200:
+                data = response.json()
+                if data.get('code') == 200 and 'tweet' in data:
+                    author = data['tweet'].get('author', {}).get('name', 'Unknown')
+                    tweet_text = data['tweet'].get('text', '')
+                    
+                    if not tweet_text:
+                        return f"[Twitter Post by {author}]\n(텍스트 없음 - 미디어/이미지 전용 트윗)"
+                    
+                    return f"[Twitter Post by {author}]\n{tweet_text}"[:6000]
+            return None
+        except Exception as e:
+            print(f"⚠️ 트위터 API 추출 실패: {e}")
+            return None
+
+    # [분기 2] 일반 웹사이트 파싱 (Jina AI)
     try:
         reader_url = f"https://r.jina.ai/{url}"
         headers = {'X-Return-Format': 'markdown', 'X-With-Generated-Alt': 'true'}
@@ -84,21 +106,20 @@ def ai_analyze(text, url_type="article"):
 
 # 3. 개인 메시지 처리
 async def process_private_messages(client, bot_username, my_channel_id):
-    print(f"📩 @gangjaa님이 {bot_username}에게 보낸 메시지 확인 중...")
+    print(f"📩 개인 메시지 확인 중 ({bot_username})...")
     check_limit = datetime.now(timezone.utc) - timedelta(hours=4) 
     
     async for msg in client.iter_messages(bot_username, limit=20):
         if msg.date < check_limit: break
         
         if msg.out and msg.text:
-            print(f"📝 메시지 발견: {msg.text[:15]}...")
-            
             urls = re.findall(r'(https?://\S+)', msg.text)
             if urls:
-                content = fetch_content(urls[0])
+                target_url = urls[0]
+                content = fetch_content(target_url)
                 if content:
                     summary = ai_analyze(content, url_type="article")
-                    source_info = f"🔗 **원본 링크:** {urls[0]}"
+                    source_info = f"🔗 **원본 링크:** {target_url}"
                 else:
                     summary = ai_analyze(msg.text, url_type="short_text")
                     source_info = "⚠️ (사이트 접속 실패로 텍스트만 분석함)"
@@ -114,7 +135,6 @@ async def process_private_messages(client, bot_username, my_channel_id):
             
             await bot.send_message(my_channel_id, report_msg)
             
-            # [수정] 봇이 답장 보낼 때 에러 발생 시 무시 (상대방이 봇으로 인식될 경우 대비)
             try:
                 await bot.send_message(msg.chat_id, "✅ 분석 완료! 채널을 확인하세요.")
             except:
@@ -122,13 +142,11 @@ async def process_private_messages(client, bot_username, my_channel_id):
                 
             await asyncio.sleep(5)
 
-# 4. [수정됨] 중복 확인 함수 (bot -> client로 변경)
-# 봇은 과거 내역 조회 권한이 없으므로, 사람 계정(client)이 확인합니다.
+# 4. 중복 확인
 async def get_posted_urls(client, channel_id):
     print("🧹 중복 방지를 위해 최근 게시물 확인 중 (Client)...")
     posted_urls = set()
     try:
-        # bot 대신 client 사용
         async for msg in client.iter_messages(channel_id, limit=50):
             if msg.text:
                 urls = re.findall(r'(https?://\S+)', msg.text)
@@ -141,7 +159,7 @@ async def get_posted_urls(client, channel_id):
 
 # 5. 메인 실행
 async def main():
-    print("🧠 심층 분석 봇 가동 (스마트 중복 방지 모드)...")
+    print("🧠 심층 분석 봇 가동 (다중 파이프라인 모드)...")
     await client.start()
     await bot.start(bot_token=bot_token)
     
@@ -154,18 +172,14 @@ async def main():
         print(f"❌ 설정 오류: {e}")
         return
 
-    # 1. 개인 메시지 처리
     try:
         await process_private_messages(client, bot_username, my_channel_id)
     except Exception as e:
         print(f"⚠️ 개인 메시지 처리 중: {e}")
 
-    # 2. [수정됨] 중복 확인 시 'client' 객체 전달
-    # 이제 사람 계정이 내 채널을 훑어보므로 에러가 나지 않습니다.
     posted_urls = await get_posted_urls(client, my_channel_id)
     print(f"🛡️ 이미 처리된 링크 {len(posted_urls)}개 제외 예정")
 
-    # 3. 채널 스캔 (시간 범위 대폭 확대: 4시간)
     chk_time = 14400 # 4시간
     
     for channel in target_channels:
