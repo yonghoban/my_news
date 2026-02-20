@@ -11,8 +11,7 @@ from datetime import datetime, timezone, timedelta
 # === [설정 영역] ===
 api_id = int(os.environ["API_ID"])
 api_hash = os.environ["API_HASH"]
-# [수정] 2번 세션 키를 주입받도록 변수명 변경 (다중 접속 충돌 방지)
-session_string = os.environ["TELEGRAM_SESSION_2"]
+session_string = os.environ["TELEGRAM_SESSION_2"] # 2번 세션 유지
 bot_token = os.environ["BOT_TOKEN"]
 gemini_api_key = os.environ["GEMINI_API_KEY"]
 
@@ -22,11 +21,10 @@ my_channel_username = '@turtleking11'
 client = TelegramClient(StringSession(session_string), api_id, api_hash)
 bot = TelegramClient('summary_bot_session', api_id, api_hash)
 
-# 1. 링크 내용 추출 (FxTwitter 및 Jina AI 이중 파이프라인)
+# 1. 링크 내용 추출
 def fetch_content(url):
     print(f"🔍 링크 파싱 시도: {url}")
     
-    # [분기 1] 트위터 우회 라우팅 (FxTwitter API)
     if "twitter.com" in url or "x.com" in url:
         api_url = re.sub(r'(https?://)?(www\.)?(twitter\.com|x\.com)', 'https://api.fxtwitter.com', url)
         try:
@@ -39,14 +37,12 @@ def fetch_content(url):
                     
                     if not tweet_text:
                         return f"[Twitter Post by {author}]\n(텍스트 없음 - 미디어/이미지 전용 트윗)"
-                    
                     return f"[Twitter Post by {author}]\n{tweet_text}"[:6000]
             return None
         except Exception as e:
             print(f"⚠️ 트위터 API 추출 실패: {e}")
             return None
 
-    # [분기 2] 일반 웹사이트 파싱 (Jina AI)
     try:
         reader_url = f"https://r.jina.ai/{url}"
         headers = {'X-Return-Format': 'markdown', 'X-With-Generated-Alt': 'true'}
@@ -59,7 +55,7 @@ def fetch_content(url):
     except:
         return None
 
-# 2. Gemini AI 분석 (인과관계 및 구조적 설명 모델 적용)
+# 2. Gemini AI 분석
 def ai_analyze(text, url_type="article"):
     models = ["gemini-2.0-flash-lite", "gemini-2.5-flash", "gemini-flash-lite-latest"]
     
@@ -107,7 +103,7 @@ def ai_analyze(text, url_type="article"):
             continue
     return "⚠️ 분석 실패"
 
-# 3. 개인 메시지 처리
+# 3. 개인 메시지 처리 (생략 없이 유지)
 async def process_private_messages(client, bot_username, my_channel_id):
     print(f"📩 개인 메시지 확인 중 ({bot_username})...")
     check_limit = datetime.now(timezone.utc) - timedelta(hours=4) 
@@ -160,7 +156,7 @@ async def get_posted_urls(client, channel_id):
         
     return posted_urls
 
-# 5. 메인 실행
+# 5. 메인 실행 (시계열 병합 로직 이식)
 async def main():
     print("🧠 심층 분석 봇 가동 (다중 파이프라인 모드)...")
     await client.start()
@@ -188,10 +184,34 @@ async def main():
     for channel in target_channels:
         print(f"📡 {channel} 스캔 중...")
         try:
+            # 5-1. 파편화된 원본 메시지 일괄 추출
+            raw_msgs = []
             async for msg in client.iter_messages(channel, limit=15):
                 if (datetime.now(timezone.utc) - msg.date).total_seconds() > chk_time: continue
-                
+                raw_msgs.append(msg)
+            
+            if not raw_msgs: continue
+            
+            # 5-2. 문맥 복원을 위한 시계열 역정렬 (오래된 글 -> 최신 글)
+            raw_msgs.sort(key=lambda x: x.date)
+            
+            # 5-3. 5초 이내 연속 전송된 메시지 병합 (Time-series Concatenation)
+            merged_posts = []
+            for msg in raw_msgs:
                 text = msg.message if msg.message else ""
+                
+                if merged_posts and (msg.date - merged_posts[-1]['date']).total_seconds() <= 5:
+                    merged_posts[-1]['text'] += "\n\n" + text
+                else:
+                    merged_posts.append({
+                        'id': msg.id,
+                        'date': msg.date,
+                        'text': text
+                    })
+            
+            # 5-4. 병합된 포스트를 기준으로 분석 파이프라인 가동
+            for post in merged_posts:
+                text = post['text']
                 urls = re.findall(r'(https?://\S+)', text)
                 
                 if urls:
@@ -207,7 +227,11 @@ async def main():
                     await asyncio.sleep(5) 
                     summary = ai_analyze(content)
                     
-                    final_msg = f"🔍 **[Simplex AI Report]**\n\n{summary}\n\n🔗 [원본]({target_url})\n출처: {channel}"
+                    # 원본 링크 생성 시 병합 그룹의 '첫 번째' 메시지 ID를 기준으로 삼음
+                    username = channel.replace('@', '')
+                    post_link = f"https://t.me/{username}/{post['id']}"
+                    
+                    final_msg = f"🔍 **[Simplex AI Report]**\n\n{summary}\n\n🔗 [원본]({post_link})\n출처: {channel}"
                     await bot.send_message(my_channel_id, final_msg, link_preview=False)
                     
                     posted_urls.add(target_url)
