@@ -1,14 +1,13 @@
 import os
 import asyncio
+import re
 from telethon import TelegramClient
 from telethon.sessions import StringSession
-from difflib import SequenceMatcher
 from datetime import datetime, timezone
 
 # === [설정 영역] ===
 api_id = int(os.environ["API_ID"])
 api_hash = os.environ["API_HASH"]
-# [수정] 1번 세션 키를 주입받도록 변수명 변경 (다중 접속 충돌 방지)
 session_string = os.environ["TELEGRAM_SESSION_1"]
 bot_token = os.environ["BOT_TOKEN"]
 
@@ -51,30 +50,63 @@ source_channels = [
     '@Dove262', '@mujammin123', '@jh_6598', '@jueokman', '@c0wfarm'
 ]
 
-# 내 채널 (사람용 주소)
 target_channel_username = '@turtleking10'
 # ===================
 
 client = TelegramClient(StringSession(session_string), api_id, api_hash)
 bot = TelegramClient('bot_session', api_id, api_hash)
 
-# [중복 방지] 텍스트 정규화 (공백 제거 후 비교)
-def normalize_text(text):
-    if not text: return ""
-    return "".join(text.split())
+# [중복 방지 1] URL 추출
+def extract_urls(text):
+    if not text: return set()
+    return set(re.findall(r'(https?://[^\s]+)', text))
 
-def is_similar(text1, text2, threshold=0.90):
-    if not text1 or not text2: return False
-    norm1 = normalize_text(text1)
-    norm2 = normalize_text(text2)
-    return SequenceMatcher(None, norm1, norm2).ratio() >= threshold
+# [중복 방지 2] 튜닝된 다중 필터 및 부피 우회 로직
+def is_duplicate_post(new_text, old_text):
+    if not new_text or not old_text: return False
+    
+    if new_text in old_text or old_text in new_text:
+        return True
+        
+    new_urls = extract_urls(new_text)
+    old_urls = extract_urls(old_text)
+    if new_urls and old_urls and new_urls.intersection(old_urls):
+        return True
+
+    clean_new = re.sub(r'[^\w\s]', '', new_text).split()
+    clean_old = re.sub(r'[^\w\s]', '', old_text).split()
+    
+    set_new = set(clean_new)
+    set_old = set(clean_old)
+    
+    len_new = len(set_new)
+    len_old = len(set_old)
+    
+    if len_new == 0 or len_old == 0: return False
+    
+    intersection_count = len(set_new.intersection(set_old))
+    min_word_count = min(len_new, len_old)
+    
+    if min_word_count < 10: 
+        return False
+        
+    similarity = intersection_count / min_word_count
+    
+    # 튜닝된 임계치: 65% 이상 단어 일치 시 중복 의심
+    if similarity >= 0.65:
+        # 1.25배 이상의 단어 팽창이 확인되면 코멘트로 인정하여 통과
+        if len_new > (len_old * 1.25):
+            print(f"💡 방장 코멘트 추가 감지 우회 (유사도 {similarity:.2f}, 팽창률 {len_new/len_old:.2f}배)")
+            return False
+        return True
+
+    return False
 
 async def main():
     print("🚀 봇 시스템 가동 중...")
     await client.start()
     await bot.start(bot_token=bot_token)
 
-    # 1. 타겟 채널 ID 확인
     try:
         entity = await client.get_entity(target_channel_username)
         real_bot_id = int(f"-100{entity.id}")
@@ -83,7 +115,6 @@ async def main():
         print(f"❌ 채널 찾기 실패: {e}")
         return
 
-    # 2. 최근 글 로딩 (기억력 4배 강화: 200개)
     recent_my_msgs = []
     async for msg in client.iter_messages(target_channel_username, limit=200):
         text = msg.message
@@ -94,7 +125,6 @@ async def main():
                 clean_text = text
             recent_my_msgs.append(clean_text)
 
-    # 3. 뉴스 가져오기
     for channel in source_channels:
         try:
             async for msg in client.iter_messages(channel, limit=30):
@@ -103,7 +133,6 @@ async def main():
 
                 new_text = msg.message if msg.message else ""
                 
-                # [광고 필터링]
                 is_ad = False
                 for keyword in ad_keywords:
                     if keyword in new_text: 
@@ -111,23 +140,18 @@ async def main():
                         break
                 if is_ad: continue
 
-                # [중복 검사]
                 if not new_text.strip():
                     continue
 
                 is_duplicate = False
                 for old_text in recent_my_msgs:
-                    if new_text in old_text: 
-                        is_duplicate = True
-                        break
-                    if is_similar(new_text, old_text):
+                    if is_duplicate_post(new_text, old_text):
                         is_duplicate = True
                         break
                 
                 if is_duplicate:
                     continue
 
-                # [전송]
                 try:
                     chat = await client.get_entity(channel)
                     source_name = chat.title
@@ -141,9 +165,7 @@ async def main():
                     if msg.media:
                         file_path = await client.download_media(msg.media)
                         
-                        # [수정] 미디어 캡션 길이 우회 로직 이식
                         if len(final_caption) <= 1000:
-                            # 1000자 이하: 기존처럼 사진과 글을 한 번에 전송
                             await bot.send_message(
                                 real_bot_id,
                                 final_caption,
@@ -151,7 +173,6 @@ async def main():
                                 link_preview=False 
                             )
                         else:
-                            # 1000자 초과: 사진 선행 전송 후 텍스트 별도 전송
                             await bot.send_message(real_bot_id, file=file_path)
                             await bot.send_message(
                                 real_bot_id,
@@ -170,7 +191,6 @@ async def main():
                         )
                         print(f"SENT: {source_name} (텍스트)")
 
-                    # 방금 보낸 것도 즉시 기억 목록에 추가
                     if new_text: recent_my_msgs.append(new_text)
                     
                 except Exception as e:
