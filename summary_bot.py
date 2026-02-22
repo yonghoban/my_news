@@ -11,7 +11,7 @@ from datetime import datetime, timezone, timedelta
 # === [설정 영역] ===
 api_id = int(os.environ["API_ID"])
 api_hash = os.environ["API_HASH"]
-session_string = os.environ["TELEGRAM_SESSION_2"] # 2번 세션 유지
+session_string = os.environ["TELEGRAM_SESSION_2"] # 2번 독립 세션
 bot_token = os.environ["BOT_TOKEN"]
 gemini_api_key = os.environ["GEMINI_API_KEY"]
 
@@ -21,10 +21,11 @@ my_channel_username = '@turtleking11'
 client = TelegramClient(StringSession(session_string), api_id, api_hash)
 bot = TelegramClient('summary_bot_session', api_id, api_hash)
 
-# 1. 링크 내용 추출
+# 1. 링크 내용 추출 파이프라인
 def fetch_content(url):
     print(f"🔍 링크 파싱 시도: {url}")
     
+    # [분기 1] 트위터 우회 라우팅
     if "twitter.com" in url or "x.com" in url:
         api_url = re.sub(r'(https?://)?(www\.)?(twitter\.com|x\.com)', 'https://api.fxtwitter.com', url)
         try:
@@ -43,6 +44,7 @@ def fetch_content(url):
             print(f"⚠️ 트위터 API 추출 실패: {e}")
             return None
 
+    # [분기 2] 일반 웹 파싱
     try:
         reader_url = f"https://r.jina.ai/{url}"
         headers = {'X-Return-Format': 'markdown', 'X-With-Generated-Alt': 'true'}
@@ -55,33 +57,20 @@ def fetch_content(url):
     except:
         return None
 
-# 2. Gemini AI 분석
+# 2. Gemini AI 분석 (초간결 모델)
 def ai_analyze(text, url_type="article"):
     models = ["gemini-2.0-flash-lite", "gemini-2.5-flash", "gemini-flash-lite-latest"]
     
     prompt = f"""
-    You are a strictly objective and logical crypto analyst.
-    Your goal is to explain complex crypto news logically and easily, focusing on causality, first principles, and second-order effects.
+    You are a crypto news summarizer for beginners.
+    Translate and summarize the following text into Korean.
     
     [Rules]
     1. Output STRICTLY in Korean.
-    2. Eliminate all subjective adjectives. Use only facts, quantitative data, and logical deductions.
-    3. End all sentences with noun forms (명사형 종결 - 예: ~함, ~임, ~상태).
-    4. Separate verifiable facts from analytical implications.
-    5. Explain complex concepts (e.g., Tokenomics, DeFi mechanisms) so that beginners can understand the structural cause.
-
-    [Output Format]
-    ### 1. 사건 개요 및 작동 원리 (Event & Mechanism)
-    * **발생 현상 (Fact)**: (핵심 사건과 정량적 변화 수치 기술)
-    * **발생 원리 (Causality)**: (해당 사건이 발생한 근본 원인과 시스템적 작동 원리를 쉽게 기술)
-
-    ### 2. 구조적 분석 및 2차 파급 효과 (Structure & 2nd-order Effects)
-    * **데이터 현황 (Data)**: (관련 온체인 데이터, 유동성 집중도, 규제 등 객관적 현황)
-    * **예상 파급 효과 (Impact)**: (위 데이터로 인해 발생 가능한 연쇄 효과 및 하방 리스크. '만약 ~라면, ~게 된다' 형태의 논리 전개)
-
-    ### 3. 시장 교차 분석 및 관찰점 (Macro Context & Insight)
-    * **거시 환경 연동 (Macro)**: (비트코인 등 거시 지표 또는 전체 자본 흐름과의 상관관계)
-    * **핵심 모니터링 지표 (Insight)**: (향후 방향성을 결정지을 정량적 관찰 대상 및 지지/저항 데이터)
+    2. 복잡한 구조나 양식을 모두 버리고, 가장 쉽고 간결한 문장으로 작성할 것.
+    3. 전체 내용을 3~4문장 이내로 최대한 압축할 것 (짧은 불렛포인트 사용 권장).
+    4. '무엇이 핵심 팩트인가'와 '그것이 투자자에게 어떤 의미인가' 두 가지만 직관적으로 전달할 것.
+    5. 어려운 전문 용어는 배제하거나 쉬운 일상어로 대체할 것.
 
     [Source Content]
     {text}
@@ -103,7 +92,7 @@ def ai_analyze(text, url_type="article"):
             continue
     return "⚠️ 분석 실패"
 
-# 3. 개인 메시지 처리 (생략 없이 유지)
+# 3. 개인 메시지 처리
 async def process_private_messages(client, bot_username, my_channel_id):
     print(f"📩 개인 메시지 확인 중 ({bot_username})...")
     check_limit = datetime.now(timezone.utc) - timedelta(hours=4) 
@@ -156,7 +145,7 @@ async def get_posted_urls(client, channel_id):
         
     return posted_urls
 
-# 5. 메인 실행 (시계열 병합 로직 이식)
+# 5. 메인 실행 (시계열 병합 로직 탑재)
 async def main():
     print("🧠 심층 분석 봇 가동 (다중 파이프라인 모드)...")
     await client.start()
@@ -195,7 +184,7 @@ async def main():
             # 5-2. 문맥 복원을 위한 시계열 역정렬 (오래된 글 -> 최신 글)
             raw_msgs.sort(key=lambda x: x.date)
             
-            # 5-3. 5초 이내 연속 전송된 메시지 병합 (Time-series Concatenation)
+            # 5-3. 5초 이내 연속 전송된 메시지 병합
             merged_posts = []
             for msg in raw_msgs:
                 text = msg.message if msg.message else ""
