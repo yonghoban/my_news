@@ -24,7 +24,7 @@ source_channels = [
     '@WeCryptoTogether', '@lnsanecoin', '@seaotterbtc', '@cryptomouseview', '@jammin0720',
     '@yobeullyANN', '@justdegenguy', '@moneygrid', '@tlsrltnf', '@doriworld', 
     '@Raoni1', '@airdropcosm', '@Gorae_gorae', '@dontworrymomcoinverygood', '@Edenitywl', 
-    '@crypto_offroad', '@dolchanchain', '@web3subin', '@ai_masters_community', 
+    '@crypto_offroad', '@dolchanchain', '@baroBTC', '@web3subin', '@ai_masters_community', 
     '@Thoughts_BFox', '@Honeyofwhitesocks_2', '@minchoisfuture', '@doratman18', '@Gorae_Insight', 
     '@chunjonghyun', '@forevernft', '@yieldagg', '@KOREAalphaDEGEN', '@saltalpha', 
     '@eastgoonercrypto', '@juhyukb', '@billair1', '@davidanecdotekr', '@vinilbongz', 
@@ -92,9 +92,7 @@ def is_duplicate_post(new_text, old_text):
         
     similarity = intersection_count / min_word_count
     
-    # 튜닝된 임계치: 65% 이상 단어 일치 시 중복 의심
     if similarity >= 0.65:
-        # 1.25배 이상의 단어 팽창이 확인되면 코멘트로 인정하여 통과
         if len_new > (len_old * 1.25):
             print(f"💡 방장 코멘트 추가 감지 우회 (유사도 {similarity:.2f}, 팽창률 {len_new/len_old:.2f}배)")
             return False
@@ -115,8 +113,9 @@ async def main():
         print(f"❌ 채널 찾기 실패: {e}")
         return
 
+    # [수정] 기억 용량 1000개로 상향
     recent_my_msgs = []
-    async for msg in client.iter_messages(target_channel_username, limit=200):
+    async for msg in client.iter_messages(target_channel_username, limit=1000):
         text = msg.message
         if text: 
             if '\n\n' in text:
@@ -128,8 +127,9 @@ async def main():
     for channel in source_channels:
         try:
             async for msg in client.iter_messages(channel, limit=30):
+                # [수정] 스캔 범위를 2시간(7200초)으로 단축
                 time_diff = datetime.now(timezone.utc) - msg.date
-                if time_diff.total_seconds() > 21600: continue
+                if time_diff.total_seconds() > 7200: continue
 
                 new_text = msg.message if msg.message else ""
                 
