@@ -11,7 +11,7 @@ from datetime import datetime, timezone, timedelta
 # === [설정 영역] ===
 api_id = int(os.environ["API_ID"])
 api_hash = os.environ["API_HASH"]
-session_string = os.environ["TELEGRAM_SESSION_2"] # 2번 독립 세션
+session_string = os.environ["TELEGRAM_SESSION_2"]
 bot_token = os.environ["BOT_TOKEN"]
 gemini_api_key = os.environ["GEMINI_API_KEY"]
 
@@ -25,7 +25,6 @@ bot = TelegramClient('summary_bot_session', api_id, api_hash)
 def fetch_content(url):
     print(f"🔍 링크 파싱 시도: {url}")
     
-    # [분기 1] 트위터 우회 라우팅
     if "twitter.com" in url or "x.com" in url:
         api_url = re.sub(r'(https?://)?(www\.)?(twitter\.com|x\.com)', 'https://api.fxtwitter.com', url)
         try:
@@ -44,7 +43,6 @@ def fetch_content(url):
             print(f"⚠️ 트위터 API 추출 실패: {e}")
             return None
 
-    # [분기 2] 일반 웹 파싱
     try:
         reader_url = f"https://r.jina.ai/{url}"
         headers = {'X-Return-Format': 'markdown', 'X-With-Generated-Alt': 'true'}
@@ -135,7 +133,8 @@ async def get_posted_urls(client, channel_id):
     print("🧹 중복 방지를 위해 최근 게시물 확인 중 (Client)...")
     posted_urls = set()
     try:
-        async for msg in client.iter_messages(channel_id, limit=50):
+        # [수정] 제한을 200개로 상향
+        async for msg in client.iter_messages(channel_id, limit=200):
             if msg.text:
                 urls = re.findall(r'(https?://\S+)', msg.text)
                 if urls:
@@ -168,12 +167,12 @@ async def main():
     posted_urls = await get_posted_urls(client, my_channel_id)
     print(f"🛡️ 이미 처리된 링크 {len(posted_urls)}개 제외 예정")
 
-    chk_time = 14400 # 4시간
+    # [수정] 스캔 범위를 2시간(7200초)으로 단축
+    chk_time = 7200 
     
     for channel in target_channels:
         print(f"📡 {channel} 스캔 중...")
         try:
-            # 5-1. 파편화된 원본 메시지 일괄 추출
             raw_msgs = []
             async for msg in client.iter_messages(channel, limit=15):
                 if (datetime.now(timezone.utc) - msg.date).total_seconds() > chk_time: continue
@@ -181,10 +180,8 @@ async def main():
             
             if not raw_msgs: continue
             
-            # 5-2. 문맥 복원을 위한 시계열 역정렬 (오래된 글 -> 최신 글)
             raw_msgs.sort(key=lambda x: x.date)
             
-            # 5-3. 5초 이내 연속 전송된 메시지 병합
             merged_posts = []
             for msg in raw_msgs:
                 text = msg.message if msg.message else ""
@@ -198,7 +195,6 @@ async def main():
                         'text': text
                     })
             
-            # 5-4. 병합된 포스트를 기준으로 분석 파이프라인 가동
             for post in merged_posts:
                 text = post['text']
                 urls = re.findall(r'(https?://\S+)', text)
@@ -216,7 +212,6 @@ async def main():
                     await asyncio.sleep(5) 
                     summary = ai_analyze(content)
                     
-                    # 원본 링크 생성 시 병합 그룹의 '첫 번째' 메시지 ID를 기준으로 삼음
                     username = channel.replace('@', '')
                     post_link = f"https://t.me/{username}/{post['id']}"
                     
