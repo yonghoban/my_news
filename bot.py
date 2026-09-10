@@ -1,3 +1,4 @@
+from telethon.tl.types import InputPeerChannel
 import os
 import asyncio
 import re
