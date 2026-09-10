@@ -21,34 +21,132 @@ ad_keywords = [
 
 # 감시할 채널들
 source_channels = [
-    '@WeCryptoTogether', '@lnsanecoin', '@seaotterbtc', '@cryptomouseview', '@jammin0720',
-    '@yobeullyANN', '@justdegenguy', '@moneygrid', '@tlsrltnf', '@doriworld', 
-    '@Raoni1', '@airdropcosm', '@Gorae_gorae', '@dontworrymomcoinverygood', '@Edenitywl', 
-    '@crypto_offroad', '@dolchanchain', '@web3subin', '@ai_masters_community', 
-    '@Thoughts_BFox', '@Honeyofwhitesocks_2', '@minchoisfuture', '@doratman18', '@Gorae_Insight', 
-    '@chunjonghyun', '@forevernft', '@yieldagg', '@KOREAalphaDEGEN', '@saltalpha', 
-    '@eastgoonercrypto', '@juhyukb', '@billair1', '@davidanecdotekr', '@vinilbongz', 
-    '@c_ryptodiary', '@dolbikong', '@effort_never_betrays_U', '@magonia_b', '@inhu0', 
-    '@cybertruck666', '@moneybottle', '@ResearchSena', '@SasukeChart', '@anancoin', 
-    '@easynoscamai', '@BQTelegram', '@chrisdoublepersona', '@gorochi22', '@Hyperliquid_KR_announce', 
-    '@Tether_Smugglers', '@Roh0517', '@Plan_G_Research', '@honeymouse1003', '@pgyinfo', 
-    '@minebuu_cryptoball', '@crypt0_sea', '@gensencoin', '@pachepunch', '@BMTube', 
-    '@justicekingsman', '@ryotmadness', '@bangguseokcrypto', '@LEEHEESANGDYOR', '@murphybus', 
-    '@pannpunch', '@therealdyor', '@killberosDAO', '@GODOGtrader', '@SOLful_hodl_life', 
-    '@JoshuaDeukKOR', '@metronome812', '@GMBLABS', '@look4treasure', '@channel_dms', 
-    '@churin0329', '@all_degens_are_dead', '@SUS_secretnote', '@kastardgood', '@RWAkr', 
-    '@cryptoponyo', '@funkyonchain', '@amgnresearch', '@ewlreads', '@gachi2job', 
-    '@CoinAlphaNo1', '@jutrobedzielepsze', '@DePIN_AI_Korea', '@JeJeCryptoDiary', '@cctgavong', 
-    '@informationdao', '@sohwak', '@dopaminemaxi', '@alpha_feeds', '@Newwaves_nft', 
-    '@CryptoFamily_ilhyun', '@bitethebulletkr', '@jerryview', '@davesalbum', '@prediction_markets_info', 
-    '@kdp_dao', '@DeSpread', '@icoroots', '@MusGGul', '@taste_suck', 
-    '@overcrypto_doom', '@mdewstable', '@xiticle', '@danielsocialclub', '@chanelnameis', 
-    '@CODE007_KR', '@whalemove_trade', '@Info_Arbitrage', '@bokjisaideashare', '@Info_Arbitrage', 
-    '@subin_gamefi_lab', '@gorochidangi', '@kbc80', '@coin369369', '@gmrvillage', 
-    '@eastsouthwind',
-    '@hyperliquid_announcements', '@narockisrock1', '@Web3LearningWithInger', 
-    '@Dove262', '@mujammin123', '@jh_6598', '@jueokman', '@c0wfarm'
+    InputPeerChannel(1396820120, -8277137941562883013), # @WeCryptoTogether
+    InputPeerChannel(1465631343, 4774107298271741836), # @lnsanecoin
+    InputPeerChannel(1313067241, 4179849229309486201), # @seaotterbtc
+    InputPeerChannel(1326359244, 2387840600152227676), # @cryptomouseview
+    InputPeerChannel(2179206614, -8382815681236004363), # @jammin0720
+    InputPeerChannel(1544137863, 4893880217681789838), # @yobeullyANN
+    InputPeerChannel(2373735487, 1383391892532742766), # @justdegenguy
+    InputPeerChannel(1733283934, 8996804192263813122), # @moneygrid
+    InputPeerChannel(1451407215, -2155480647585030688), # @tlsrltnf
+    InputPeerChannel(1510700616, 126884145332118078), # @doriworld
+    InputPeerChannel(1259934336, 4181747256265576999), # @Raoni1
+    InputPeerChannel(2078740044, -7505065249724735067), # @airdropcosm
+    InputPeerChannel(3931856019, -4476899008680814159), # @Gorae_gorae
+    InputPeerChannel(2132063118, -1270535778772125772), # @dontworrymomcoinverygood
+    InputPeerChannel(2423228517, -3618221212000543395), # @Edenitywl
+    InputPeerChannel(3870259445, -3587965899864610750), # @crypto_offroad
+    InputPeerChannel(2192941716, 1790244434396455053), # @dolchanchain
+    InputPeerChannel(1588820796, -1635300001276390474), # @web3subin
+    InputPeerChannel(1856015924, 2489600532520609478), # @ai_masters_community
+    InputPeerChannel(2556510058, -6734094317361577873), # @Thoughts_BFox
+    InputPeerChannel(1535698497, -2041550562059701111), # @Honeyofwhitesocks_2
+    InputPeerChannel(1621568519, 4891274937207605718), # @minchoisfuture
+    InputPeerChannel(1864238560, 4029679992058141425), # @doratman18
+    InputPeerChannel(1226189796, -4619760585456243986), # @chunjonghyun
+    InputPeerChannel(1645555058, 6916182789246563011), # @forevernft
+    InputPeerChannel(1806285150, -8543975683639426975), # @KOREAalphaDEGEN
+    InputPeerChannel(3020050059, -7088098084828714926), # @saltalpha
+    InputPeerChannel(1707333905, -888572553200744054), # @eastgoonercrypto
+    InputPeerChannel(1797237914, 931955497981526530), # @juhyukb
+    InputPeerChannel(1847658483, -4215261014339353488), # @billair1
+    InputPeerChannel(1634677564, 1025528071149100502), # @davidanecdotekr
+    InputPeerChannel(1738204270, 3030647438863089676), # @c_ryptodiary
+    InputPeerChannel(1588597281, -4835295564971416188), # @dolbikong
+    InputPeerChannel(3172464972, 3655865147126395040), # @effort_never_betrays_U
+    InputPeerChannel(1652098893, -7348086446374723573), # @magonia_b
+    InputPeerChannel(2107531589, -6326581881514395232), # @inhu0
+    InputPeerChannel(1908194425, 1738373570129500448), # @cybertruck666
+    InputPeerChannel(1319564729, -5007511276717502994), # @moneybottle
+    InputPeerChannel(1532523189, 6437918650519547441), # @ResearchSena
+    InputPeerChannel(1731411148, 3283842490316362592), # @SasukeChart
+    InputPeerChannel(1538528686, 5364019371555046958), # @anancoin
+    InputPeerChannel(2574511154, 6896778521666315069), # @easynoscamai
+    InputPeerChannel(1761254803, -3726356088876330106), # @BQTelegram
+    InputPeerChannel(2342070015, -2366230513395724121), # @chrisdoublepersona
+    InputPeerChannel(2237628177, 4733409816282594456), # @gorochi22
+    InputPeerChannel(2339532413, -4617350462283659664), # @Hyperliquid_KR_announce
+    InputPeerChannel(4405317448, -5847281379384302714), # @Tether_Smugglers
+    InputPeerChannel(2408900977, -4033770340707242685), # @Roh0517
+    InputPeerChannel(2448633395, -8132615683301792241), # @Plan_G_Research
+    InputPeerChannel(1554974037, 1178706745559314501), # @honeymouse1003
+    InputPeerChannel(1301520513, 765218452639259980), # @pgyinfo
+    InputPeerChannel(1584183723, -5022469109965414623), # @minebuu_cryptoball
+    InputPeerChannel(1769342188, 5306367747164752002), # @crypt0_sea
+    InputPeerChannel(1230780667, -1925635561861981993), # @gensencoin
+    InputPeerChannel(1869932358, 213424257171520199), # @pachepunch
+    InputPeerChannel(1808910034, -2658466703422009858), # @BMTube
+    InputPeerChannel(1645632215, -4098308677741249983), # @justicekingsman
+    InputPeerChannel(2307869453, 4272885985472298163), # @ryotmadness
+    InputPeerChannel(2086739233, 2650964270685890237), # @bangguseokcrypto
+    InputPeerChannel(1917610401, 3058417795274955803), # @LEEHEESANGDYOR
+    InputPeerChannel(1829994590, -7116187817974267719), # @murphybus
+    InputPeerChannel(2402400717, 306967358827511164), # @pannpunch
+    InputPeerChannel(2214669041, 1995486205604435117), # @therealdyor
+    InputPeerChannel(1736699211, 1464071284250190986), # @killberosDAO
+    InputPeerChannel(1470829795, 3340137868037219913), # @GODOGtrader
+    InputPeerChannel(2279232195, -8362658662893311932), # @SOLful_hodl_life
+    InputPeerChannel(2391207730, -1621383852410511176), # @JoshuaDeukKOR
+    InputPeerChannel(3654000819, 4789602667142433992), # @metronome812
+    InputPeerChannel(1566624832, -4822867803096199397), # @GMBLABS
+    InputPeerChannel(3855640363, 3827724325622324551), # @look4treasure
+    InputPeerChannel(1577805179, 8519111466183059517), # @channel_dms
+    InputPeerChannel(1590774317, 3767957104105471613), # @churin0329
+    InputPeerChannel(3904375404, 4686351268041801165), # @all_degens_are_dead
+    InputPeerChannel(1631164900, -4029653689883176530), # @SUS_secretnote
+    InputPeerChannel(2133256660, 5493068448700184590), # @kastardgood
+    InputPeerChannel(2692233584, -7324138082629879353), # @RWAkr
+    InputPeerChannel(2508135923, -6303727476614073625), # @cryptoponyo
+    InputPeerChannel(1473726267, -7486680835991729310), # @funkyonchain
+    InputPeerChannel(2389856356, -5982069441550543731), # @amgnresearch
+    InputPeerChannel(2042687149, 5524513589864460688), # @ewlreads
+    InputPeerChannel(1447581120, 7983717750465401744), # @gachi2job
+    InputPeerChannel(1500490454, -3307969127940787386), # @CoinAlphaNo1
+    InputPeerChannel(1591164152, 2392060565423008827), # @jutrobedzielepsze
+    InputPeerChannel(2234825371, -2721029656400497646), # @DePIN_AI_Korea
+    InputPeerChannel(1737854826, -3095399235733245950), # @JeJeCryptoDiary
+    InputPeerChannel(2096221383, -2031020452375952780), # @cctgavong
+    InputPeerChannel(1549749423, 5797858655893493369), # @informationdao
+    InputPeerChannel(1357074781, 3067719840558471302), # @sohwak
+    InputPeerChannel(1811805490, 7271289435579944851), # @dopaminemaxi
+    InputPeerChannel(2379279982, 8953928295482919359), # @alpha_feeds
+    InputPeerChannel(1720130524, 377819656638366410), # @Newwaves_nft
+    InputPeerChannel(1224626870, -3321824835224324672), # @CryptoFamily_ilhyun
+    InputPeerChannel(2083348480, -6250030765694386385), # @bitethebulletkr
+    InputPeerChannel(1528701712, 4870716781673434046), # @jerryview
+    InputPeerChannel(2096672667, 5520248756383551478), # @davesalbum
+    InputPeerChannel(2923324679, -7971304287916669382), # @prediction_markets_info
+    InputPeerChannel(1809307893, 8332215329163054814), # @kdp_dao
+    InputPeerChannel(1324843181, 1148302425594619381), # @DeSpread
+    InputPeerChannel(1173057128, -687539842484140112), # @icoroots
+    InputPeerChannel(1305258308, -2255583068193618950), # @MusGGul
+    InputPeerChannel(3388064904, 3959934382874018439), # @taste_suck
+    InputPeerChannel(2722179190, -8912060335313481186), # @overcrypto_doom
+    InputPeerChannel(2739764803, -2427237964984779825), # @mdewstable
+    InputPeerChannel(2720360052, 7321947057363489790), # @xiticle
+    InputPeerChannel(1527165172, 2038091338682110960), # @danielsocialclub
+    InputPeerChannel(2313792916, -6146192568564892279), # @chanelnameis
+    InputPeerChannel(1562144076, -8926405859012811171), # @CODE007_KR
+    InputPeerChannel(2888426629, -8361158253640597609), # @whalemove_trade
+    InputPeerChannel(1983031968, 2863895062917587131), # @Info_Arbitrage
+    InputPeerChannel(1220905316, -3880827759336350794), # @bokjisaideashare
+    InputPeerChannel(1983031968, 2863895062917587131), # @Info_Arbitrage
+    InputPeerChannel(1746984526, -4352280999315522460), # @subin_gamefi_lab
+    InputPeerChannel(4336928861, -3790617861608702102), # @kbc80
+    InputPeerChannel(1730476183, -7530929280656639735), # @coin369369
+    InputPeerChannel(2113336245, 888899954831891460), # @gmrvillage
+    InputPeerChannel(2138876010, 8548110576709438378), # @eastsouthwind
+    InputPeerChannel(1736253760, -8745870935985907903), # @hyperliquid_announcements
+    InputPeerChannel(1830958061, -8910784000156449105), # @narockisrock1
+    InputPeerChannel(1948387284, 156927520860725459), # @Web3LearningWithInger
+    InputPeerChannel(2111377812, 1331163272015361658), # @Dove262
+    InputPeerChannel(1741175404, 1976404625206709368), # @mujammin123
+    InputPeerChannel(2121770704, -498043317101452955), # @jh_6598
+    InputPeerChannel(2693190763, 3154358130256837610), # @jueokman
+    InputPeerChannel(2185344588, 3633809012623031231), # @c0wfarm
 ]
+
 
 target_channel_username = '@turtleking10'
 # ===================
