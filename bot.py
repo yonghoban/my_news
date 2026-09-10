@@ -1,10 +1,10 @@
-from telethon.tl.types import InputPeerChannel
 import os
 import asyncio
 import re
+from datetime import datetime, timezone
 from telethon import TelegramClient
 from telethon.sessions import StringSession
-from datetime import datetime, timezone
+from telethon.tl.types import InputPeerChannel
 
 # === [설정 영역] ===
 api_id = int(os.environ["API_ID"])
@@ -20,7 +20,7 @@ ad_keywords = [
     "입금 이벤트", "가입 이벤트"
 ]
 
-# 감시할 채널들
+# 감시할 채널들 (InputPeerChannel 객체 리스트)
 source_channels = [
     InputPeerChannel(1396820120, -8277137941562883013), # @WeCryptoTogether
     InputPeerChannel(1465631343, 4774107298271741836), # @lnsanecoin
@@ -132,7 +132,6 @@ source_channels = [
     InputPeerChannel(2888426629, -8361158253640597609), # @whalemove_trade
     InputPeerChannel(1983031968, 2863895062917587131), # @Info_Arbitrage
     InputPeerChannel(1220905316, -3880827759336350794), # @bokjisaideashare
-    InputPeerChannel(1983031968, 2863895062917587131), # @Info_Arbitrage
     InputPeerChannel(1746984526, -4352280999315522460), # @subin_gamefi_lab
     InputPeerChannel(4336928861, -3790617861608702102), # @kbc80
     InputPeerChannel(1730476183, -7530929280656639735), # @coin369369
@@ -147,7 +146,6 @@ source_channels = [
     InputPeerChannel(2693190763, 3154358130256837610), # @jueokman
     InputPeerChannel(2185344588, 3633809012623031231), # @c0wfarm
 ]
-
 
 target_channel_username = '@turtleking10'
 # ===================
@@ -255,8 +253,13 @@ async def main():
                     chat = await client.get_entity(channel)
                     source_name = chat.title
                     
-                    username = channel.replace('@', '') 
-                    post_link = f"https://t.me/{username}/{msg.id}"
+                    # [오류 수정] channel 객체에서 올바르게 username 또는 id 추출하여 링크 생성
+                    if hasattr(chat, 'username') and chat.username:
+                        post_link = f"https://t.me/{chat.username}/{msg.id}"
+                    else:
+                        # 유저네임이 없는 사설/공개 채널의 경우 ID 기반 대체 링크 또는채널 ID 활용
+                        channel_id_str = str(chat.id).replace('-100', '')
+                        post_link = f"https://t.me/c/{channel_id_str}/{msg.id}"
                     
                     header = f"↪️ Forwarded from: **[{source_name}]({post_link})**\n\n"
                     final_caption = header + new_text
@@ -279,7 +282,7 @@ async def main():
                                 link_preview=False
                             )
                             
-                        if os.path.exists(file_path):
+                        if file_path and os.path.exists(file_path):
                             os.remove(file_path)
                         print(f"SENT: {source_name} (미디어 처리 완료)")
                     else:
@@ -293,12 +296,17 @@ async def main():
                     if new_text: recent_my_msgs.append(new_text)
                     
                 except Exception as e:
-                    print(f"Error processing {channel}: {e}")
+                    print(f"Error processing channel item: {e}")
 
         except Exception as e:
-            print(f"Error checking {channel}: {e}")
+            print(f"Error checking channel {channel.channel_id}: {e}")
 
     print("확인 끝.")
+    
+    # 작업 완료 후 클라이언트 안전 종료
+    await client.disconnect()
+    await bot.disconnect()
 
-with client:
-    client.loop.run_until_complete(main())
+if __name__ == '__main__':
+    with client:
+        client.loop.run_until_complete(main())
